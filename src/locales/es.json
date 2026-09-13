@@ -1,0 +1,49 @@
+{
+  "app": {
+    "name": "Academia Aristóteles",
+    "virtualClassroom": "Aula Virtual"
+  },
+  "navigation": {
+    "home": "Inicio",
+    "courses": "Mis cursos",
+    "tasks": "Tareas",
+    "profile": "Perfil",
+    "main": "Navegación principal",
+    "expand": "Expandir menú",
+    "collapse": "Contraer menú",
+    "close": "Cerrar menú"
+  },
+  "dashboard": {
+    "hello": "Hola, {{name}}",
+    "welcome": "Bienvenido a tu aula virtual.",
+    "activeCourses": "Cursos activos",
+    "pendingTasks": "Tareas pendientes",
+    "nextClass": "Próxima clase",
+    "myCourses": "Mis cursos",
+    "upcomingTasks": "Próximas tareas",
+    "recentActivity": "Actividad reciente",
+    "enter": "Entrar",
+    "viewAll": "Ver todos",
+    "loading": "Cargando dashboard...",
+    "error": "No se pudo cargar el dashboard.",
+    "retry": "Reintentar",
+    "search": "Buscar",
+    "notifications": "Notificaciones",
+    "menu": "Abrir menú",
+    "currentPeriod": "Período actual",
+    "toReview": "Por revisar",
+    "bannerAlt": "Academia Aristóteles — Aula Virtual"
+  },
+  "student": {
+    "role": "Estudiante",
+    "defaultName": "Carlos Sánchez",
+    "defaultInitials": "CS"
+  },
+  "placeholders": {
+    "title": "Por implementar",
+    "description": "Esta sección estará disponible próximamente.",
+    "courses": "Mis cursos",
+    "tasks": "Tareas",
+    "profile": "Perfil"
+  }
+}
