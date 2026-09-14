@@ -1,4 +1,7 @@
+import { useAuth } from "../../auth/useAuth";
+import { dashboardPath } from "../../auth/types";
 import {
+  Users,
   BookOpen,
   House,
   UserRound,
@@ -6,18 +9,18 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-} from 'lucide-react';
+} from "lucide-react";
 
-import { NavLink } from 'react-router-dom';
-import { useState } from 'react';
+import { NavLink } from "react-router-dom";
+import { useState } from "react";
 
-import { t } from '../../lib/i18n';
+import { t } from "../../lib/i18n";
 
-const navItems = [
-  { label: t('navigation.home'), icon: House, to: '/' },
-  { label: t('navigation.courses'), icon: BookOpen, to: '/courses' },
-  { label: t('navigation.tasks'), icon: ClipboardList, to: '/tasks' },
-  { label: t('navigation.profile'), icon: UserRound, to: '/profile' },
+const studentNavItems = [
+  { label: t("navigation.home"), icon: House, to: "/" },
+  { label: t("navigation.courses"), icon: BookOpen, to: "/courses" },
+  { label: t("navigation.tasks"), icon: ClipboardList, to: "/tasks" },
+  { label: t("navigation.profile"), icon: UserRound, to: "/profile" },
 ];
 
 type SidebarProps = {
@@ -26,10 +29,31 @@ type SidebarProps = {
 };
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { user } = useAuth();
+  const navItems =
+    user?.role === "STUDENT"
+      ? studentNavItems
+      : [
+          {
+            label: t("navigation.home"),
+            icon: House,
+            to: user ? dashboardPath(user.role) : "/login",
+          },
+          ...(user?.role === "ADMIN"
+            ? [
+                {
+                  label: t("navigation.users"),
+                  icon: Users,
+                  to: "/admin/users",
+                },
+              ]
+            : []),
+          { label: t("navigation.profile"), icon: UserRound, to: "/profile" },
+        ];
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const toggleLabel = t(
-    isCollapsed ? 'navigation.expand' : 'navigation.collapse',
+    isCollapsed ? "navigation.expand" : "navigation.collapse",
   );
 
   return (
@@ -38,7 +62,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {isOpen && (
         <button
           type="button"
-          aria-label={t('navigation.close')}
+          aria-label={t("navigation.close")}
           onClick={onClose}
           className="fixed inset-0 z-40 bg-slate-950/30 backdrop-blur-[1px] lg:hidden"
         />
@@ -53,8 +77,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           lg:sticky lg:top-0 lg:translate-x-0
 
-          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          ${isCollapsed ? 'lg:w-[76px]' : 'w-[280px] lg:w-[260px]'}
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+          ${isCollapsed ? "lg:w-[76px]" : "w-[280px] lg:w-[260px]"}
         `}
       >
         {/* Desktop collapse control */}
@@ -83,7 +107,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* Mobile close */}
         <button
           type="button"
-          aria-label={t('navigation.close')}
+          aria-label={t("navigation.close")}
           onClick={onClose}
           className="
             absolute right-4 top-4
@@ -102,24 +126,24 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             flex shrink-0 flex-col items-center justify-center
             border-b border-slate-100
             transition-all duration-300
-            ${isCollapsed ? 'lg:h-[112px] lg:px-3' : 'h-[150px] px-5'}
+            ${isCollapsed ? "lg:h-[112px] lg:px-3" : "h-[150px] px-5"}
           `}
         >
           {/* Full logo */}
           <div
             className={`
               flex flex-col items-center
-              ${isCollapsed ? 'lg:hidden' : ''}
+              ${isCollapsed ? "lg:hidden" : ""}
             `}
           >
             <img
               src="/images/acedemy.png"
-              alt={t('app.name')}
+              alt={t("app.name")}
               className="h-auto w-[185px] object-contain"
             />
 
             <p className="mt-3 text-sm font-medium text-slate-500">
-              {t('app.virtualClassroom')}
+              {t("app.virtualClassroom")}
             </p>
           </div>
 
@@ -127,12 +151,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div
             className={`
               hidden items-center justify-center
-              ${isCollapsed ? 'lg:flex' : ''}
+              ${isCollapsed ? "lg:flex" : ""}
             `}
           >
             <img
               src="/favicon.png"
-              alt={t('app.name')}
+              alt={t("app.name")}
               className="h-11 w-11 rounded-xl object-contain"
             />
           </div>
@@ -142,15 +166,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         <nav
           className={`
             flex-1 space-y-2 py-5
-            ${isCollapsed ? 'lg:px-3' : 'px-4'}
+            ${isCollapsed ? "lg:px-3" : "px-4"}
           `}
-          aria-label={t('navigation.main')}
+          aria-label={t("navigation.main")}
         >
           {navItems.map(({ label, icon: Icon, to }) => (
             <NavLink
               key={to}
               to={to}
-              end={to === '/'}
+              end
               onClick={onClose}
               aria-label={label}
               title={isCollapsed ? label : undefined}
@@ -160,16 +184,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   text-sm font-medium
                   transition-colors duration-200
 
-                  ${
-                    isCollapsed
-                      ? 'lg:justify-center lg:px-0'
-                      : 'gap-3 px-4'
-                  }
+                  ${isCollapsed ? "lg:justify-center lg:px-0" : "gap-3 px-4"}
 
                   ${
                     isActive
-                      ? 'bg-sky-50 text-sky-700'
-                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                      ? "bg-sky-50 text-sky-700"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                   }
                 `
               }
@@ -180,14 +200,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     size={20}
                     strokeWidth={1.8}
                     className={`shrink-0 ${
-                      isActive ? 'text-sky-600' : 'text-slate-500'
+                      isActive ? "text-sky-600" : "text-slate-500"
                     }`}
                   />
 
                   <span
                     className={`
                       whitespace-nowrap
-                      ${isCollapsed ? 'lg:hidden' : ''}
+                      ${isCollapsed ? "lg:hidden" : ""}
                     `}
                   >
                     {label}

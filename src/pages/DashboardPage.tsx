@@ -1,3 +1,4 @@
+import { useAuth } from '../auth/useAuth';
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock } from 'lucide-react';
 
@@ -12,6 +13,7 @@ import type { DashboardResponse } from '../types/dashboard';
 import { t } from '../lib/i18n';
 
 export function DashboardPage() {
+  const { user } = useAuth();
   const [dashboard, setDashboard] =
     useState<DashboardResponse | null>(null);
 
@@ -122,7 +124,7 @@ export function DashboardPage() {
                     <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">
                         {t('dashboard.hello', {
-                        name: dashboard.student.name.split(' ')[0],
+                        name: (user?.fullName ?? dashboard.student.name).split(' ')[0],
                         })}
                     </h1>
 

@@ -11,7 +11,8 @@
     "main": "Navegación principal",
     "expand": "Expandir menú",
     "collapse": "Contraer menú",
-    "close": "Cerrar menú"
+    "close": "Cerrar menú",
+    "users": "Usuarios"
   },
   "dashboard": {
     "hello": "Hola, {{name}}",
@@ -45,5 +46,59 @@
     "courses": "Mis cursos",
     "tasks": "Tareas",
     "profile": "Perfil"
+  },
+  "roles": {
+    "ADMIN": "Administrador",
+    "TEACHER": "Docente",
+    "STUDENT": "Estudiante"
+  },
+  "auth": {
+    "title": "Iniciar sesión",
+    "subtitle": "Selecciona tu rol para continuar",
+    "ADMIN": "Gestiona la plataforma",
+    "TEACHER": "Enseña y acompaña",
+    "STUDENT": "Aprende y crece",
+    "username": "Usuario",
+    "password": "Contraseña",
+    "submit": "Ingresar",
+    "submitting": "Ingresando…",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña",
+    "loading": "Restaurando sesión…",
+    "error": "Usuario, contraseña o rol incorrectos. Verifica tus datos.",
+    "connectionError": "No se pudo conectar. Inténtalo nuevamente.",
+    "logout": "Cerrar sesión",
+    "loggingOut": "Cerrando sesión…",
+    "logoutError": "No se pudo cerrar la sesión. Inténtalo nuevamente.",
+    "role": "Rol"
+  },
+  "admin": {
+    "title": "Panel de administración",
+    "subtitle": "Gestiona los usuarios de la plataforma.",
+    "total": "Total de usuarios",
+    "students": "Estudiantes",
+    "teachers": "Docentes",
+    "users": "Gestión de usuarios",
+    "create": "Crear usuario",
+    "name": "Nombre",
+    "fullName": "Nombre completo",
+    "status": "Estado",
+    "createdAt": "Fecha de creación",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "cancel": "Cancelar",
+    "saving": "Guardando…",
+    "success": "Usuario creado correctamente.",
+    "error": "No se pudo guardar el usuario. Verifica los datos e inténtalo nuevamente.",
+    "duplicate": "Este usuario ya existe. Elige otro nombre de usuario.",
+    "loadError": "No se pudieron cargar los usuarios.",
+    "empty": "Aún no hay usuarios.",
+    "loading": "Cargando usuarios…",
+    "close": "Cerrar formulario",
+    "unavailable": "—"
+  },
+  "teacher": {
+    "title": "Panel del docente",
+    "description": "Este módulo estará disponible próximamente."
   }
 }
