@@ -1,7 +1,10 @@
+import { PaymentsPage } from "./pages/PaymentsPage";
+import { AcademicCycleDetailPage } from "./pages/AcademicCycleDetailPage";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { DashboardPage } from "./pages/DashboardPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { LoginPage } from "./pages/LoginPage";
+import { AcademicCyclesPage } from "./pages/AcademicCyclesPage";
 import { AdminPage } from "./pages/AdminPage";
 import { AuthProvider } from "./auth/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
@@ -36,7 +39,13 @@ function App() {
           </Route>
           <Route element={<ProtectedRoute role="ADMIN" />}>
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/payments" element={<PaymentsPage />} />
             <Route path="/admin/users" element={<AdminPage />} />
+            <Route path="/admin/cycles" element={<AcademicCyclesPage />} />
+            <Route
+              path="/admin/cycles/:id"
+              element={<AcademicCycleDetailPage />}
+            />
           </Route>
           <Route element={<ProtectedRoute role="TEACHER" />}>
             <Route

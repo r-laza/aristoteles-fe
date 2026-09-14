@@ -1,7 +1,9 @@
 import { useAuth } from "../../auth/useAuth";
 import { dashboardPath } from "../../auth/types";
 import {
+  Wallet,
   Users,
+  CalendarDays,
   BookOpen,
   House,
   UserRound,
@@ -45,6 +47,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   label: t("navigation.users"),
                   icon: Users,
                   to: "/admin/users",
+                },
+                {
+                  label: t("navigation.cycles"),
+                  icon: CalendarDays,
+                  to: "/admin/cycles",
+                },
+                {
+                  label: t("payments.title"),
+                  icon: Wallet,
+                  to: "/admin/payments",
                 },
               ]
             : []),
