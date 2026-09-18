@@ -1,13 +1,21 @@
-import { CycleModal as Modal } from "../features/cycles/CycleModal";
+import { CycleForm } from "../features/cycles/CycleForm";
 import { EnrollmentForm } from "../features/cycles/EnrollmentForm";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  Users,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { t } from "../lib/i18n";
 import { ApiError } from "../services/api";
 import {
   cycleApi,
+  feeAvailable,
   getCycle,
   cycleStatus,
   todayKey,
@@ -24,78 +32,12 @@ const amount = (value: number | string) =>
       maximumFractionDigits: 2,
     }),
   });
-function GroupForm({
-  id,
-  onClose,
-  onCreated,
-}: {
-  id: string;
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const name = String(new FormData(event.currentTarget).get("name")).trim();
-    if (!name) {
-      setError(t("cycles.invalid"));
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      await cycleApi.createGroup(id, name);
-      onCreated();
-    } catch (error) {
-      setError(
-        t(
-          error instanceof ApiError && error.status === 409
-            ? "cycleDetail.groupDuplicate"
-            : "cycleDetail.saveError",
-        ),
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <Modal title={t("cycleDetail.createGroup")} busy={busy} onClose={onClose}>
-      <form onSubmit={(event) => void submit(event)} className="space-y-4">
-        <label htmlFor="group-name" className="field-label">
-          {t("cycleDetail.groupName")}
-        </label>
-        <input
-          autoFocus
-          id="group-name"
-          name="name"
-          required
-          maxLength={100}
-          disabled={busy}
-          className="field"
-        />
-        {error && (
-          <p role="alert" className="text-red-700">
-            {error}
-          </p>
-        )}
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onClose}
-            className="rounded-xl border px-4 py-2"
-          >
-            {t("admin.cancel")}
-          </button>
-          <button disabled={busy} className="primary-button">
-            {t(busy ? "admin.saving" : "cycleDetail.createGroup")}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
+const normalize = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es");
+
 export function AcademicCycleDetailPage() {
   const { id = "" } = useParams();
   const [data, setData] = useState<{
@@ -106,8 +48,30 @@ export function AcademicCycleDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
-  const [tab, setTab] = useState<"students" | "groups">("students");
+  const studentsSection = useRef<HTMLElement>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [modal, setModal] = useState<"group" | "enrollment" | null>(null);
+  const [groupFilter, setGroupFilter] = useState("");
+  const filteredEnrollments =
+    data?.enrollments.filter(
+      (enrollment) =>
+        (!groupFilter || enrollment.group.id === Number(groupFilter)) &&
+        normalize(
+          `${enrollment.student.fullName} ${enrollment.student.username}`,
+        ).includes(normalize(search.trim())),
+    ) ?? [];
+  const pageSize = 20;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredEnrollments.length / pageSize),
+  );
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * pageSize;
+  const visibleEnrollments = filteredEnrollments.slice(
+    pageStart,
+    pageStart + pageSize,
+  );
   const [success, setSuccess] = useState("");
   const [today, setToday] = useState(todayKey);
   useEffect(() => {
@@ -120,6 +84,9 @@ export function AcademicCycleDetailPage() {
       .then(([cycle, groups, enrollments]) => {
         if (!cancelled) {
           setData({ cycle, groups, enrollments });
+          setGroupFilter((current) =>
+            groups.some((group) => String(group.id) === current) ? current : "",
+          );
           setError("");
         }
       })
@@ -142,6 +109,7 @@ export function AcademicCycleDetailPage() {
   }, [id, version]);
   function refresh(message: string) {
     setModal(null);
+    setPage(1);
     setSuccess(t(message));
     setLoading(true);
     setVersion((value) => value + 1);
@@ -150,7 +118,8 @@ export function AcademicCycleDetailPage() {
     "admin.name",
     "auth.username",
     "cycleDetail.group",
-    "cycles.baseFee",
+    "cycleDetail.fee",
+    "cycleDetail.assignedAmount",
     "cycleDetail.discount",
     "cycleDetail.total",
     "admin.status",
@@ -194,26 +163,13 @@ export function AcademicCycleDetailPage() {
               <span className="rounded-full bg-cyan-50 px-3 py-1 text-sm font-semibold text-sky-800">
                 {t(`cycles.${cycleStatus(data.cycle, today)}`)}
               </span>
+              <button
+                className="primary-button sm:ml-auto"
+                onClick={() => setModal("group")}
+              >
+                {t("cycles.edit")}
+              </button>
             </div>
-            <dl className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-5">
-              {[
-                ["cycles.start", formatCycleDate(data.cycle.startDate)],
-                ["cycles.end", formatCycleDate(data.cycle.endDate)],
-                ["cycles.baseFee", amount(data.cycle.baseFee)],
-                ["cycles.students", data.cycle.students],
-                ["cycles.groups", data.cycle.groups],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="min-w-0 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"
-                >
-                  <dt className="text-sm text-slate-500">{t(String(label))}</dt>
-                  <dd className="mt-2 break-words text-lg font-semibold text-sky-950">
-                    {value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
             {success && (
               <p
                 role="status"
@@ -222,166 +178,361 @@ export function AcademicCycleDetailPage() {
                 {success}
               </p>
             )}
-            <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
+            <section aria-label={t("cycleDetail.summary")} className="mb-6">
+              <dl className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                {[
+                  ["cycles.startDate", formatCycleDate(data.cycle.startDate)],
+                  ["cycles.endDate", formatCycleDate(data.cycle.endDate)],
+                  ["cycles.students", data.cycle.students],
+                  ["cycles.groups", data.cycle.groups],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="min-w-0 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"
+                  >
+                    <dt className="text-sm text-slate-500">
+                      {t(String(label))}
+                    </dt>
+                    <dd className="mt-2 break-words text-lg font-semibold text-sky-950">
+                      {value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+            <section
+              aria-labelledby="cycle-groups-title"
+              className="mb-6 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6"
+            >
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex gap-2">
-                  {(["students", "groups"] as const).map((value) => (
-                    <button
-                      key={value}
-                      aria-pressed={tab === value}
-                      onClick={() => setTab(value)}
-                      className={`rounded-xl px-4 py-2 font-medium ${tab === value ? "bg-sky-50 text-sky-800" : "text-slate-500 hover:bg-slate-50"}`}
-                    >
-                      {t(`cycles.${value}`)}
-                    </button>
-                  ))}
-                </div>
+                <h2
+                  id="cycle-groups-title"
+                  className="text-xl font-semibold text-sky-950"
+                >
+                  {t("cycleDetail.groups")}
+                </h2>
                 <button
-                  disabled={tab === "students" && data.groups.length === 0}
+                  className="primary-button"
                   onClick={() => {
                     setSuccess("");
-                    setModal(tab === "students" ? "enrollment" : "group");
+                    setModal("group");
                   }}
-                  className="primary-button"
                 >
-                  <Plus size={18} />
-                  {t(
-                    tab === "students"
-                      ? "cycleDetail.enroll"
-                      : "cycleDetail.createGroup",
-                  )}
+                  {t("cycles.editAssignments")}
                 </button>
               </div>
-              {tab === "groups" ? (
-                data.groups.length === 0 ? (
-                  <p className="py-6 text-center text-slate-500">
-                    {t("cycleDetail.noGroups")}
-                  </p>
-                ) : (
-                  <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {data.groups.map((group) => (
-                      <li
-                        key={group.id}
-                        className="rounded-2xl border border-slate-100 p-5"
-                      >
-                        <Users size={22} className="mb-3 text-cyan-600" />
-                        <h2 className="break-words text-lg font-semibold text-sky-950">
-                          {group.name}
-                        </h2>
-                        <p className="mt-2 text-sm text-slate-500">
-                          {t("cycleDetail.groupCount", {
-                            count: group._count.enrollments,
-                          })}
+              {data.groups.length === 0 ? (
+                <p className="py-6 text-center text-slate-500">
+                  {t("cycleDetail.noGroups")}
+                </p>
+              ) : (
+                <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {data.groups.map((group) => (
+                    <li
+                      key={group.id}
+                      className="rounded-2xl border border-slate-100 p-5"
+                    >
+                      <Users size={22} className="mb-3 text-cyan-600" />
+                      <h2 className="break-words text-lg font-semibold text-sky-950">
+                        {group.name}
+                      </h2>
+                      <p className="mt-2 text-sm text-slate-500">
+                        {t("cycleDetail.groupCount", {
+                          count: group._count.enrollments,
+                        })}
+                      </p>
+                      {group.fees.length === 0 ? (
+                        <p className="mt-4 text-sm text-slate-500">
+                          {t("cycleDetail.noFees")}
                         </p>
+                      ) : (
+                        <ul className="mt-4 space-y-3">
+                          {group.fees.map((fee) => (
+                            <li
+                              key={fee.id}
+                              className="rounded-xl bg-slate-50 p-3"
+                            >
+                              <div className="flex flex-wrap justify-between gap-2">
+                                <span className="break-words font-medium">
+                                  {fee.name}
+                                </span>
+                                <span className="font-semibold">
+                                  {amount(fee.amount)}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {t(
+                                  fee.validUntil
+                                    ? "cycleDetail.feeValidity"
+                                    : "cycleDetail.feeValidityOpen",
+                                  {
+                                    from: formatCycleDate(
+                                      fee.validFrom.slice(0, 10),
+                                    ),
+                                    until: fee.validUntil
+                                      ? formatCycleDate(
+                                          fee.validUntil.slice(0, 10),
+                                        )
+                                      : t("cycleDetail.noEndDate"),
+                                  },
+                                )}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {t(
+                                  feeAvailable(fee)
+                                    ? "cycleDetail.feeActive"
+                                    : "cycleDetail.feeInactive",
+                                )}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <div className="mt-4 flex flex-wrap gap-4 text-sm font-medium text-sky-700">
+                        <button onClick={() => setModal("group")}>
+                          {t("cycles.editAssignments")}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setGroupFilter(String(group.id));
+                            setSearch("");
+                            setPage(1);
+                            studentsSection.current?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "start",
+                            });
+                            studentsSection.current?.focus({
+                              preventScroll: true,
+                            });
+                          }}
+                        >
+                          {t("cycleDetail.viewStudents")}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section
+              ref={studentsSection}
+              tabIndex={-1}
+              aria-labelledby="cycle-students-title"
+              className="scroll-mt-6 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6"
+            >
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <h2
+                  id="cycle-students-title"
+                  className="text-xl font-semibold text-sky-950"
+                >
+                  {t("cycles.students")}
+                </h2>
+                <button
+                  disabled={data.groups.length === 0}
+                  className="primary-button"
+                  onClick={() => {
+                    setSuccess("");
+                    setModal("enrollment");
+                  }}
+                >
+                  <Plus size={18} aria-hidden="true" />
+                  {t("cycleDetail.enroll")}
+                </button>
+              </div>
+              <div className="mb-4 grid items-end gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="cycle-student-search" className="field-label">
+                    {t("cycleDetail.searchStudents")}
+                  </label>
+                  <div className="relative">
+                    <Search
+                      size={18}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      id="cycle-student-search"
+                      type="search"
+                      className="field pl-10"
+                      placeholder={t("cycleDetail.searchStudentsPlaceholder")}
+                      value={search}
+                      onChange={(event) => {
+                        setSearch(event.target.value);
+                        setPage(1);
+                      }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="student-group-filter" className="field-label">
+                    {t("cycleDetail.group")}
+                  </label>
+                  <select
+                    id="student-group-filter"
+                    value={groupFilter}
+                    onChange={(event) => {
+                      setGroupFilter(event.target.value);
+                      setPage(1);
+                    }}
+                    className="field"
+                  >
+                    <option value="">{t("cycleDetail.allGroups")}</option>
+                    {data.groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {data.groups.length === 0 && (
+                <p className="mb-4 rounded-xl bg-sky-50 p-3 text-sm text-sky-800">
+                  {t("cycleDetail.needGroup")}
+                </p>
+              )}
+              {filteredEnrollments.length === 0 ? (
+                <p className="py-6 text-center text-slate-500">
+                  {t(
+                    data.enrollments.length
+                      ? "cycleDetail.noMatchingStudents"
+                      : "cycleDetail.noEnrollments",
+                  )}
+                </p>
+              ) : (
+                <>
+                  <div className="hidden xl:block">
+                    <table className="w-full table-fixed text-left text-sm">
+                      <thead>
+                        <tr>
+                          {labels.map((label) => (
+                            <th
+                              key={label}
+                              scope="col"
+                              className="border-b px-2 py-3 font-medium text-slate-500"
+                            >
+                              {t(label)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleEnrollments.map((enrollment) => (
+                          <tr
+                            key={enrollment.id}
+                            className="border-b border-slate-100 last:border-0"
+                          >
+                            {[
+                              enrollment.student.fullName,
+                              enrollment.student.username,
+                              enrollment.group.name,
+                              enrollment.fee.name,
+                              amount(enrollment.baseAmount),
+                              amount(enrollment.discountAmount),
+                              amount(enrollment.finalAmount),
+                              t("cycleDetail.ACTIVE"),
+                            ].map((value, i) => (
+                              <td
+                                key={labels[i]}
+                                className="break-words px-2 py-4"
+                              >
+                                {value}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <ul className="space-y-4 xl:hidden">
+                    {visibleEnrollments.map((enrollment) => (
+                      <li
+                        key={enrollment.id}
+                        className="rounded-xl border border-slate-100 p-4"
+                      >
+                        <h2 className="break-words font-semibold text-sky-950">
+                          {enrollment.student.fullName}
+                        </h2>
+                        <dl className="mt-3 space-y-2">
+                          {[
+                            enrollment.student.username,
+                            enrollment.group.name,
+                            enrollment.fee.name,
+                            amount(enrollment.baseAmount),
+                            amount(enrollment.discountAmount),
+                            amount(enrollment.finalAmount),
+                            t("cycleDetail.ACTIVE"),
+                          ].map((value, i) => (
+                            <div
+                              key={labels[i + 1]}
+                              className="flex justify-between gap-4 text-sm"
+                            >
+                              <dt className="text-slate-500">
+                                {t(labels[i + 1])}
+                              </dt>
+                              <dd className="min-w-0 break-words text-right">
+                                {value}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
                       </li>
                     ))}
                   </ul>
-                )
-              ) : (
-                <>
-                  {data.groups.length === 0 && (
-                    <p className="mb-4 rounded-xl bg-sky-50 p-3 text-sm text-sky-800">
-                      {t("cycleDetail.needGroup")}
-                    </p>
-                  )}
-                  {data.enrollments.length === 0 ? (
-                    <p className="py-6 text-center text-slate-500">
-                      {t("cycleDetail.noEnrollments")}
-                    </p>
-                  ) : (
-                    <>
-                      <div className="hidden xl:block">
-                        <table className="w-full table-fixed text-left text-sm">
-                          <thead>
-                            <tr>
-                              {labels.map((label) => (
-                                <th
-                                  key={label}
-                                  scope="col"
-                                  className="border-b px-2 py-3 font-medium text-slate-500"
-                                >
-                                  {t(label)}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {data.enrollments.map((enrollment) => (
-                              <tr
-                                key={enrollment.id}
-                                className="border-b border-slate-100 last:border-0"
-                              >
-                                {[
-                                  enrollment.student.fullName,
-                                  enrollment.student.username,
-                                  enrollment.group.name,
-                                  amount(enrollment.baseAmount),
-                                  amount(enrollment.discountAmount),
-                                  amount(enrollment.finalAmount),
-                                  t("cycleDetail.ACTIVE"),
-                                ].map((value, i) => (
-                                  <td
-                                    key={labels[i]}
-                                    className="break-words px-2 py-4"
-                                  >
-                                    {value}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <ul className="space-y-4 xl:hidden">
-                        {data.enrollments.map((enrollment) => (
-                          <li
-                            key={enrollment.id}
-                            className="rounded-xl border border-slate-100 p-4"
-                          >
-                            <h2 className="break-words font-semibold text-sky-950">
-                              {enrollment.student.fullName}
-                            </h2>
-                            <dl className="mt-3 space-y-2">
-                              {[
-                                enrollment.student.username,
-                                enrollment.group.name,
-                                amount(enrollment.baseAmount),
-                                amount(enrollment.discountAmount),
-                                amount(enrollment.finalAmount),
-                                t("cycleDetail.ACTIVE"),
-                              ].map((value, i) => (
-                                <div
-                                  key={labels[i + 1]}
-                                  className="flex justify-between gap-4 text-sm"
-                                >
-                                  <dt className="text-slate-500">
-                                    {t(labels[i + 1])}
-                                  </dt>
-                                  <dd className="min-w-0 break-words text-right">
-                                    {value}
-                                  </dd>
-                                </div>
-                              ))}
-                            </dl>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
                 </>
               )}
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4">
+                <p role="status" className="text-sm text-slate-500">
+                  {t("cycleDetail.studentRange", {
+                    from: filteredEnrollments.length ? pageStart + 1 : 0,
+                    to: Math.min(
+                      pageStart + pageSize,
+                      filteredEnrollments.length,
+                    ),
+                    total: filteredEnrollments.length,
+                  })}
+                </p>
+                <nav
+                  aria-label={t("cycleDetail.pagination")}
+                  className="flex items-center gap-3"
+                >
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setPage(currentPage - 1)}
+                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronLeft size={16} aria-hidden="true" />
+                    {t("cycleDetail.previousPage")}
+                  </button>
+                  <span className="text-sm text-slate-500">
+                    {t("cycleDetail.pageOf", {
+                      page: currentPage,
+                      total: totalPages,
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setPage(currentPage + 1)}
+                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {t("cycleDetail.nextPage")}
+                    <ChevronRight size={16} aria-hidden="true" />
+                  </button>
+                </nav>
+              </div>
             </section>
             {modal === "group" && (
-              <GroupForm
-                id={id}
+              <CycleForm
+                cycle={data.cycle}
+                initialGroups={data.groups}
                 onClose={() => setModal(null)}
-                onCreated={() => refresh("cycleDetail.groupCreated")}
+                onCreated={() => refresh("cycles.updated")}
               />
             )}
             {modal === "enrollment" && (
               <EnrollmentForm
                 id={id}
-                cycle={data.cycle}
                 groups={data.groups}
                 onClose={() => setModal(null)}
                 onCreated={() => refresh("cycleDetail.enrolled")}

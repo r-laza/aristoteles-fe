@@ -4,7 +4,7 @@ import { ApiError } from "../../services/api";
 import { CycleModal as Modal } from "./CycleModal";
 import {
   cycleApi,
-  type AcademicCycle,
+  feeAvailable,
   type CycleGroup,
   type AvailableStudent,
 } from "./cycles";
@@ -17,13 +17,11 @@ const amount = (value: number | string) =>
   });
 export function EnrollmentForm({
   id,
-  cycle,
   groups,
   onClose,
   onCreated,
 }: {
   id: string;
-  cycle: AcademicCycle;
   groups: CycleGroup[];
   onClose: () => void;
   onCreated: () => void;
@@ -32,6 +30,14 @@ export function EnrollmentForm({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [groupId, setGroupId] = useState("");
+  const [feeId, setFeeId] = useState("");
+  const fees =
+    groups
+      .find((group) => group.id === Number(groupId))
+      ?.fees.filter((fee) => feeAvailable(fee)) ?? [];
+  const fee = fees.find((fee) => fee.id === Number(feeId));
+  const baseFee = Number(fee?.amount ?? 0);
   const [discount, setDiscount] = useState("0");
   useEffect(() => {
     let cancelled = false;
@@ -51,10 +57,11 @@ export function EnrollmentForm({
     };
   }, [id]);
   const finalCents =
-    Math.round(cycle.baseFee * 100) - Math.round(Number(discount || "0") * 100);
+    Math.round(baseFee * 100) - Math.round(Number(discount || "0") * 100);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
+      !fee ||
       !Number.isFinite(finalCents) ||
       finalCents < 0 ||
       Number(discount) < 0
@@ -68,7 +75,8 @@ export function EnrollmentForm({
     try {
       await cycleApi.enroll(id, {
         studentId: Number(data.get("studentId")),
-        groupId: Number(data.get("groupId")),
+        groupId: Number(groupId),
+        feeId: Number(feeId),
         discountAmount: discount || "0",
         discountReason: String(data.get("discountReason")).trim(),
       });
@@ -130,7 +138,11 @@ export function EnrollmentForm({
                 id="enroll-group"
                 name="groupId"
                 required
-                defaultValue=""
+                value={groupId}
+                onChange={(event) => {
+                  setGroupId(event.target.value);
+                  setFeeId("");
+                }}
                 className="field"
               >
                 <option value="" disabled>
@@ -144,13 +156,42 @@ export function EnrollmentForm({
               </select>
             </div>
             <div>
+              <label htmlFor="enroll-fee" className="field-label">
+                {t("cycleDetail.fee")}
+              </label>
+              <select
+                id="enroll-fee"
+                required
+                value={feeId}
+                onChange={(event) => setFeeId(event.target.value)}
+                className="field"
+              >
+                <option value="" disabled>
+                  {t("cycleDetail.selectFee")}
+                </option>
+                {fees.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {t("cycleDetail.feeOption", {
+                      name: option.name,
+                      amount: amount(option.amount),
+                    })}
+                  </option>
+                ))}
+              </select>
+              {groupId && fees.length === 0 && (
+                <p className="mt-2 text-sm text-slate-500">
+                  {t("cycleDetail.noActiveFees")}
+                </p>
+              )}
+            </div>
+            <div>
               <label htmlFor="enroll-base" className="field-label">
-                {t("cycles.baseFee")}
+                {t("cycleDetail.assignedAmount")}
               </label>
               <input
                 id="enroll-base"
                 readOnly
-                value={amount(cycle.baseFee)}
+                value={amount(baseFee)}
                 className="field bg-slate-50"
               />
             </div>
@@ -162,7 +203,7 @@ export function EnrollmentForm({
                 id="enroll-discount"
                 type="number"
                 min="0"
-                max={cycle.baseFee}
+                max={baseFee}
                 step="0.01"
                 value={discount}
                 onChange={(event) => setDiscount(event.target.value)}
@@ -211,7 +252,7 @@ export function EnrollmentForm({
               {t("admin.cancel")}
             </button>
             <button
-              disabled={busy || students.length === 0 || finalCents < 0}
+              disabled={busy || !fee || students.length === 0 || finalCents < 0}
               className="primary-button"
             >
               {t(busy ? "admin.saving" : "cycleDetail.enroll")}

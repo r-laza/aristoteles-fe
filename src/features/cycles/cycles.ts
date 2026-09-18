@@ -4,7 +4,6 @@ export type AcademicCycle = {
   name: string;
   startDate: string;
   endDate: string;
-  baseFee: number;
   students: number;
   groups: number;
 };
@@ -40,7 +39,6 @@ type CycleResponse = {
   name: string;
   startDate: string;
   endDate: string;
-  baseEnrollmentAmount: string;
   _count: { enrollments: number; groups: number };
 };
 function mapCycle(cycle: CycleResponse): AcademicCycle {
@@ -49,7 +47,6 @@ function mapCycle(cycle: CycleResponse): AcademicCycle {
     name: cycle.name,
     startDate: cycle.startDate.slice(0, 10),
     endDate: cycle.endDate.slice(0, 10),
-    baseFee: Number(cycle.baseEnrollmentAmount),
     students: cycle._count.enrollments,
     groups: cycle._count.groups,
   };
@@ -60,22 +57,60 @@ export async function readCycles(): Promise<AcademicCycle[]> {
 export async function getCycle(id: string): Promise<AcademicCycle> {
   return mapCycle(await api<CycleResponse>(`/api/admin/cycles/${id}`));
 }
-export async function saveCycle(cycle: {
-  name: string;
-  startDate: string;
-  endDate: string;
-  baseFee: number;
-}): Promise<AcademicCycle> {
+export type GroupAssignment = { groupId: number; feeId: number | null };
+export async function saveCycle(
+  cycle: {
+    groups: GroupAssignment[];
+    name: string;
+    startDate: string;
+    endDate: string;
+  },
+  id?: number,
+): Promise<AcademicCycle> {
   return mapCycle(
-    await api<CycleResponse>("/api/admin/cycles", {
-      name: cycle.name,
-      startDate: cycle.startDate,
-      endDate: cycle.endDate,
-      baseEnrollmentAmount: cycle.baseFee,
-    }),
+    await api<CycleResponse>(
+      id ? `/api/admin/cycles/${id}` : "/api/admin/cycles",
+      {
+        groups: cycle.groups.map(({ groupId, feeId }) => ({
+          groupId,
+          feeIds: feeId === null ? [] : [feeId],
+        })),
+        name: cycle.name,
+        startDate: cycle.startDate,
+        endDate: cycle.endDate,
+      },
+    ),
+  );
+}
+export type CatalogGroup = ReusableGroup & { _count: { cycles: number } };
+export type ReusableGroup = { id: number; name: string };
+export type CatalogFee = EnrollmentFee & {
+  _count: { cycleGroups: number; enrollments: number };
+};
+export type EnrollmentFee = {
+  id: number;
+  name: string;
+  amount: string;
+  validFrom: string;
+  validUntil: string | null;
+};
+export function feeAvailable(
+  fee: EnrollmentFee,
+  today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Guayaquil",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date()),
+) {
+  return (
+    fee.validFrom.slice(0, 10) <= today &&
+    (!fee.validUntil || fee.validUntil.slice(0, 10) >= today)
   );
 }
 export type CycleGroup = {
+  reusableGroupId: number;
+  fees: EnrollmentFee[];
   id: number;
   name: string;
   _count: { enrollments: number };
@@ -84,6 +119,7 @@ export type CycleEnrollment = {
   id: number;
   student: { id: number; fullName: string; username: string };
   group: { id: number; name: string };
+  fee: EnrollmentFee;
   baseAmount: string;
   discountAmount: string;
   discountReason: string | null;
@@ -96,9 +132,29 @@ export type AvailableStudent = {
   username: string;
 };
 export const cycleApi = {
+  deleteCycle: (id: number) =>
+    api<{ id: number }>(`/api/admin/cycles/${id}/delete`, {}),
   groups: (id: string) => api<CycleGroup[]>(`/api/admin/cycles/${id}/groups`),
-  createGroup: (id: string, name: string) =>
-    api(`/api/admin/cycles/${id}/groups`, { name }),
+  deleteGroup: (id: number) =>
+    api<{ id: number }>(`/api/admin/groups/${id}/delete`, {}),
+  reusableGroups: () => api<CatalogGroup[]>("/api/admin/groups"),
+  saveGroup: (name: string, id?: number) =>
+    api<ReusableGroup>(id ? `/api/admin/groups/${id}` : "/api/admin/groups", {
+      name,
+    }),
+  deleteFee: (id: number) =>
+    api<{ id: number }>(`/api/admin/fees/${id}/delete`, {}),
+  reusableFees: () => api<CatalogFee[]>("/api/admin/fees"),
+  saveFee: (
+    input: {
+      name: string;
+      amount: string;
+      validFrom: string;
+      validUntil: string;
+    },
+    id?: number,
+  ) =>
+    api<EnrollmentFee>(id ? `/api/admin/fees/${id}` : "/api/admin/fees", input),
   available: (id: string) =>
     api<AvailableStudent[]>(`/api/admin/cycles/${id}/available-students`),
   enrollments: (id: string) =>
@@ -108,6 +164,7 @@ export const cycleApi = {
     input: {
       studentId: number;
       groupId: number;
+      feeId: number;
       discountAmount: string;
       discountReason: string;
     },

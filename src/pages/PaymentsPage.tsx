@@ -346,7 +346,6 @@ function EnrollFromPayments({
     return (
       <EnrollmentForm
         id={String(cycleId)}
-        cycle={data.cycle}
         groups={data.groups}
         onClose={onClose}
         onCreated={onCreated}
@@ -420,7 +419,7 @@ function CycleBalances({ cycleId }: { cycleId: number }) {
   const columns = [
     "payments.student",
     "cycleDetail.group",
-    "cycles.baseFee",
+    "cycleDetail.assignedAmount",
     "cycleDetail.discount",
     "payments.due",
     "payments.paid",
