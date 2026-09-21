@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { t } from "../../lib/i18n";
 import {
   cycleApi,
-  type EnrollmentFee,
+  type Pension,
   type GroupAssignment,
   type ReusableGroup,
 } from "./cycles";
@@ -19,7 +19,7 @@ export function GroupAssignments({
   onReady: (ready: boolean) => void;
 }) {
   const [groups, setGroups] = useState<ReusableGroup[]>([]);
-  const [fees, setFees] = useState<EnrollmentFee[]>([]);
+  const [fees, setFees] = useState<Pension[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [version, setVersion] = useState(0);
@@ -27,7 +27,7 @@ export function GroupAssignments({
   useEffect(() => {
     let cancelled = false;
     onReady(false);
-    Promise.all([cycleApi.reusableGroups(), cycleApi.reusableFees()])
+    Promise.all([cycleApi.reusableGroups(), cycleApi.reusablePensions()])
       .then(([groups, fees]) => {
         if (!cancelled) {
           setGroups(groups);
@@ -77,7 +77,7 @@ export function GroupAssignments({
           )}
           {fees.length === 0 && (
             <p className="text-sm text-slate-500">
-              {t("cycles.createFeesFirst")}
+              {t("pensionCatalog.createFirst")}
             </p>
           )}
           <fieldset disabled={disabled} className="space-y-4">
@@ -95,20 +95,20 @@ export function GroupAssignments({
                       htmlFor={`group-fee-${row.groupId}`}
                       className="field-label"
                     >
-                      {t("cycleDetail.fee")}
+                      {t("pensionCatalog.pension")}
                     </label>
                     <select
                       id={`group-fee-${row.groupId}`}
                       className="field"
                       aria-required="true"
-                      value={row.feeId ?? ""}
+                      value={row.pensionId ?? ""}
                       onChange={(event) =>
                         onChange(
                           value.map((group) =>
                             group.groupId === row.groupId
                               ? {
                                   ...group,
-                                  feeId: event.target.value
+                                  pensionId: event.target.value
                                     ? Number(event.target.value)
                                     : null,
                                 }
@@ -117,10 +117,10 @@ export function GroupAssignments({
                         )
                       }
                     >
-                      <option value="">{t("cycleDetail.selectFee")}</option>
+                      <option value="">{t("pensionCatalog.select")}</option>
                       {fees.map((fee) => (
                         <option key={fee.id} value={fee.id}>
-                          {t("cycles.feeLabel", {
+                          {t("pensionCatalog.monthlyLabel", {
                             name: fee.name,
                             amount: t("cycles.amount", {
                               amount: Number(fee.amount).toFixed(2),
@@ -160,7 +160,7 @@ export function GroupAssignments({
                         const groupId = Number(event.target.value);
                         if (!available.some((group) => group.id === groupId))
                           return;
-                        onChange([...value, { groupId, feeId: null }]);
+                        onChange([...value, { groupId, pensionId: null }]);
                         setAdding(false);
                       }}
                     >

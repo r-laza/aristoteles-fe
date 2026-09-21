@@ -3,6 +3,8 @@ import { X } from "lucide-react";
 import { t } from "../../lib/i18n";
 import { ApiError } from "../../services/api";
 import {
+  cycleApi,
+  type EnrollmentFee,
   saveCycle,
   type AcademicCycle,
   type CycleGroup,
@@ -27,9 +29,32 @@ export function CycleForm({
   const [groups, setGroups] = useState<GroupAssignment[]>(
     initialGroups.map((group) => ({
       groupId: group.reusableGroupId,
-      feeId: group.fees.length === 1 ? group.fees[0].id : null,
+      pensionId: group.pensionId,
     })),
   );
+  const [fees, setFees] = useState<EnrollmentFee[]>([]);
+  const [feeId, setFeeId] = useState<number | "">(cycle?.feeId ?? "");
+  const [feesReady, setFeesReady] = useState(false);
+  const [feeLoadError, setFeeLoadError] = useState(false);
+  const [feeVersion, setFeeVersion] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    cycleApi
+      .reusableFees()
+      .then((data) => {
+        if (!cancelled) {
+          setFees(data);
+          setFeesReady(true);
+          setFeeLoadError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFeeLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [feeVersion]);
   const [ready, setReady] = useState(false);
   useEffect(() => {
     dialog.current?.showModal();
@@ -49,8 +74,10 @@ export function CycleForm({
     }
     if (
       !ready ||
+      !feesReady ||
+      !feeId ||
       !groups.length ||
-      groups.some((group) => group.feeId === null) ||
+      groups.some((group) => group.pensionId === null) ||
       new Set(groups.map((group) => group.groupId)).size !== groups.length
     ) {
       setError(t("cycles.assignmentsRequired"));
@@ -67,6 +94,7 @@ export function CycleForm({
             startDate,
             endDate,
             groups,
+            feeId: Number(feeId),
           },
           cycle?.id,
         ),
@@ -155,6 +183,47 @@ export function CycleForm({
               />
             </div>
           </div>
+          <div>
+            <label htmlFor="cycle-fee" className="field-label">
+              {t("pensionCatalog.generalFee")}
+            </label>
+            <select
+              id="cycle-fee"
+              className="field"
+              required
+              value={feeId}
+              onChange={(event) =>
+                setFeeId(event.target.value ? Number(event.target.value) : "")
+              }
+            >
+              <option value="">{t("cycleDetail.selectFee")}</option>
+              {fees.map((fee) => (
+                <option key={fee.id} value={fee.id}>
+                  {t("cycles.feeLabel", {
+                    name: fee.name,
+                    amount: t("cycles.amount", {
+                      amount: Number(fee.amount).toFixed(2),
+                    }),
+                  })}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-sm text-slate-500">
+              {t("pensionCatalog.generalFeeHint")}
+            </p>
+            {feeLoadError && (
+              <div role="alert">
+                {t("cycles.catalogError")}
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => setFeeVersion((v) => v + 1)}
+                >
+                  {t("dashboard.retry")}
+                </button>
+              </div>
+            )}
+          </div>
           <GroupAssignments
             value={groups}
             onChange={setGroups}
@@ -175,7 +244,10 @@ export function CycleForm({
             >
               {t("admin.cancel")}
             </button>
-            <button disabled={busy || !ready} className="primary-button">
+            <button
+              disabled={busy || !ready || !feesReady}
+              className="primary-button"
+            >
               {t(
                 busy
                   ? "admin.saving"

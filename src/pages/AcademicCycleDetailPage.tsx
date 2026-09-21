@@ -15,7 +15,6 @@ import { t } from "../lib/i18n";
 import { ApiError } from "../services/api";
 import {
   cycleApi,
-  feeAvailable,
   getCycle,
   cycleStatus,
   todayKey,
@@ -178,6 +177,12 @@ export function AcademicCycleDetailPage() {
                 {success}
               </p>
             )}
+            {data.cycle.fee && (
+              <p className="mb-4 text-slate-600">
+                {t("pensionCatalog.generalFee")}: {data.cycle.fee.name} ·{" "}
+                {amount(data.cycle.fee.amount)}
+              </p>
+            )}
             <section aria-label={t("cycleDetail.summary")} className="mb-6">
               <dl className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
                 {[
@@ -241,53 +246,24 @@ export function AcademicCycleDetailPage() {
                           count: group._count.enrollments,
                         })}
                       </p>
-                      {group.fees.length === 0 ? (
-                        <p className="mt-4 text-sm text-slate-500">
-                          {t("cycleDetail.noFees")}
+                      <div className="mt-4 rounded-xl bg-slate-50 p-3">
+                        <p className="text-sm text-slate-500">
+                          {t("pensionCatalog.pension")}
                         </p>
-                      ) : (
-                        <ul className="mt-4 space-y-3">
-                          {group.fees.map((fee) => (
-                            <li
-                              key={fee.id}
-                              className="rounded-xl bg-slate-50 p-3"
-                            >
-                              <div className="flex flex-wrap justify-between gap-2">
-                                <span className="break-words font-medium">
-                                  {fee.name}
-                                </span>
-                                <span className="font-semibold">
-                                  {amount(fee.amount)}
-                                </span>
-                              </div>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {t(
-                                  fee.validUntil
-                                    ? "cycleDetail.feeValidity"
-                                    : "cycleDetail.feeValidityOpen",
-                                  {
-                                    from: formatCycleDate(
-                                      fee.validFrom.slice(0, 10),
-                                    ),
-                                    until: fee.validUntil
-                                      ? formatCycleDate(
-                                          fee.validUntil.slice(0, 10),
-                                        )
-                                      : t("cycleDetail.noEndDate"),
-                                  },
-                                )}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {t(
-                                  feeAvailable(fee)
-                                    ? "cycleDetail.feeActive"
-                                    : "cycleDetail.feeInactive",
-                                )}
-                              </p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                        <p className="font-medium">
+                          {group.pension
+                            ? t("pensionCatalog.monthlyLabel", {
+                                name: group.pension.name,
+                                amount: amount(group.pension.amount),
+                              })
+                            : t("pensionCatalog.unassigned")}
+                        </p>
+                        {group.pension && (
+                          <p className="mt-1 text-xs text-slate-500">
+                            {t("pensionCatalog.dueDay")}: {group.pension.dueDay}
+                          </p>
+                        )}
+                      </div>
                       <div className="mt-4 flex flex-wrap gap-4 text-sm font-medium text-sky-700">
                         <button onClick={() => setModal("group")}>
                           {t("cycles.editAssignments")}

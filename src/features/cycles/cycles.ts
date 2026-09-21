@@ -4,6 +4,8 @@ export type AcademicCycle = {
   name: string;
   startDate: string;
   endDate: string;
+  feeId: number | null;
+  fee: EnrollmentFee | null;
   students: number;
   groups: number;
 };
@@ -35,6 +37,8 @@ export function orderCycles(
   });
 }
 type CycleResponse = {
+  feeId: number | null;
+  fee: EnrollmentFee | null;
   id: number;
   name: string;
   startDate: string;
@@ -47,6 +51,8 @@ function mapCycle(cycle: CycleResponse): AcademicCycle {
     name: cycle.name,
     startDate: cycle.startDate.slice(0, 10),
     endDate: cycle.endDate.slice(0, 10),
+    feeId: cycle.feeId,
+    fee: cycle.fee,
     students: cycle._count.enrollments,
     groups: cycle._count.groups,
   };
@@ -57,9 +63,10 @@ export async function readCycles(): Promise<AcademicCycle[]> {
 export async function getCycle(id: string): Promise<AcademicCycle> {
   return mapCycle(await api<CycleResponse>(`/api/admin/cycles/${id}`));
 }
-export type GroupAssignment = { groupId: number; feeId: number | null };
+export type GroupAssignment = { groupId: number; pensionId: number | null };
 export async function saveCycle(
   cycle: {
+    feeId: number;
     groups: GroupAssignment[];
     name: string;
     startDate: string;
@@ -71,10 +78,8 @@ export async function saveCycle(
     await api<CycleResponse>(
       id ? `/api/admin/cycles/${id}` : "/api/admin/cycles",
       {
-        groups: cycle.groups.map(({ groupId, feeId }) => ({
-          groupId,
-          feeIds: feeId === null ? [] : [feeId],
-        })),
+        groups: cycle.groups,
+        feeId: cycle.feeId,
         name: cycle.name,
         startDate: cycle.startDate,
         endDate: cycle.endDate,
@@ -85,7 +90,7 @@ export async function saveCycle(
 export type CatalogGroup = ReusableGroup & { _count: { cycles: number } };
 export type ReusableGroup = { id: number; name: string };
 export type CatalogFee = EnrollmentFee & {
-  _count: { cycleGroups: number; enrollments: number };
+  _count: { cycles: number; cycleGroups: number; enrollments: number };
 };
 export type EnrollmentFee = {
   id: number;
@@ -108,7 +113,17 @@ export function feeAvailable(
     (!fee.validUntil || fee.validUntil.slice(0, 10) >= today)
   );
 }
+export type Pension = {
+  id: number;
+  name: string;
+  amount: string;
+  dueDay: number;
+  isActive: boolean;
+};
+export type CatalogPension = Pension & { _count: { cycleGroups: number } };
 export type CycleGroup = {
+  pension: Pension | null;
+  pensionId: number | null;
   reusableGroupId: number;
   fees: EnrollmentFee[];
   id: number;
@@ -132,6 +147,14 @@ export type AvailableStudent = {
   username: string;
 };
 export const cycleApi = {
+  reusablePensions: () => api<CatalogPension[]>("/api/admin/pensions"),
+  savePension: (input: Omit<Pension, "id">, id?: number) =>
+    api<Pension>(
+      id ? `/api/admin/pensions/${id}` : "/api/admin/pensions",
+      input,
+    ),
+  deletePension: (id: number) =>
+    api<{ id: number }>(`/api/admin/pensions/${id}/delete`, {}),
   deleteCycle: (id: number) =>
     api<{ id: number }>(`/api/admin/cycles/${id}/delete`, {}),
   groups: (id: string) => api<CycleGroup[]>(`/api/admin/cycles/${id}/groups`),

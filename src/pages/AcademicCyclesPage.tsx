@@ -3,6 +3,7 @@ import {
   EditCycleModal,
   DeleteCycleModal,
 } from "../features/cycles/CycleActions";
+import { ReusablePensions } from "../features/cycles/ReusablePensions";
 import { ReusableFees } from "../features/cycles/ReusableFees";
 import { CycleForm } from "../features/cycles/CycleForm";
 import { ReusableGroups } from "../features/cycles/ReusableGroups";
@@ -21,7 +22,9 @@ import {
 } from "../features/cycles/cycles";
 
 export function AcademicCyclesPage() {
-  const [tab, setTab] = useState<"cycles" | "groups" | "fees">("cycles");
+  const [tab, setTab] = useState<"cycles" | "groups" | "fees" | "pensions">(
+    "cycles",
+  );
   const [cycles, setCycles] = useState<AcademicCycle[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -81,8 +84,8 @@ export function AcademicCyclesPage() {
             </button>
           )}
         </div>
-        <div className="mb-6 flex gap-2">
-          {(["cycles", "groups", "fees"] as const).map((value) => (
+        <div className="mb-6 flex flex-wrap gap-2">
+          {(["cycles", "groups", "fees", "pensions"] as const).map((value) => (
             <button
               key={value}
               aria-pressed={tab === value}
@@ -93,7 +96,9 @@ export function AcademicCyclesPage() {
             </button>
           ))}
         </div>
-        {tab === "fees" ? (
+        {tab === "pensions" ? (
+          <ReusablePensions />
+        ) : tab === "fees" ? (
           <ReusableFees />
         ) : tab === "groups" ? (
           <ReusableGroups />
