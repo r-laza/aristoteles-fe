@@ -1,14 +1,31 @@
 import { api } from "./api";
+export type PaymentType = "ENROLLMENT" | "PENSION";
+export type PaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "OVERDUE";
+export type Obligation = {
+  paymentType: PaymentType;
+  period: string | null;
+  dueDate: string | null;
+  amountDue: string;
+  amountPaid: string;
+  balance: string;
+  status: PaymentStatus;
+};
 export type PaymentRow = {
+  enrollmentFeeName: string;
+  pensionName: string | null;
+  pensionMonthlyAmount: string | null;
+  cycle: string;
+  obligations: Obligation[];
+  lastPaymentDate: string | null;
   id: number;
   student: { fullName: string; username: string };
-  group: { name: string };
+  group: { id: number; name: string };
   baseAmount: string;
   discountAmount: string;
   amountDue: string;
   amountPaid: string;
   balance: string;
-  status: "PENDING" | "PARTIAL" | "PAID";
+  status: PaymentStatus;
 };
 export type Balances = {
   rows: PaymentRow[];
@@ -16,6 +33,8 @@ export type Balances = {
 };
 export const methods = ["CASH", "TRANSFER", "CARD", "OTHER"] as const;
 export type PaymentInput = {
+  paymentType: PaymentType;
+  period: string | null;
   amount: string;
   paymentDate: string;
   paymentMethod: string;
