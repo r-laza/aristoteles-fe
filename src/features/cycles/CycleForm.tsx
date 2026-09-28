@@ -16,11 +16,13 @@ export function CycleForm({
   initialGroups = [],
   onClose,
   onCreated,
+  detailsOnly = false,
 }: {
   cycle?: AcademicCycle;
   initialGroups?: CycleGroup[];
   onClose: () => void;
   onCreated: (cycle: AcademicCycle) => void;
+  detailsOnly?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
@@ -55,7 +57,7 @@ export function CycleForm({
       cancelled = true;
     };
   }, [feeVersion]);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(detailsOnly);
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -76,9 +78,10 @@ export function CycleForm({
       !ready ||
       !feesReady ||
       !feeId ||
-      !groups.length ||
-      groups.some((group) => group.pensionId === null) ||
-      new Set(groups.map((group) => group.groupId)).size !== groups.length
+      (!detailsOnly &&
+        (!groups.length ||
+          groups.some((group) => group.pensionId === null) ||
+          new Set(groups.map((group) => group.groupId)).size !== groups.length))
     ) {
       setError(t("cycles.assignmentsRequired"));
       return;
@@ -88,16 +91,23 @@ export function CycleForm({
     setError("");
     try {
       onCreated(
-        await saveCycle(
-          {
-            name,
-            startDate,
-            endDate,
-            groups,
-            feeId: Number(feeId),
-          },
-          cycle?.id,
-        ),
+        detailsOnly && cycle
+          ? await cycleApi.updateDetails(cycle.id, {
+              name,
+              startDate,
+              endDate,
+              feeId: Number(feeId),
+            })
+          : await saveCycle(
+              {
+                name,
+                startDate,
+                endDate,
+                groups,
+                feeId: Number(feeId),
+              },
+              cycle?.id,
+            ),
       );
     } catch (error) {
       setError(
@@ -224,12 +234,14 @@ export function CycleForm({
               </div>
             )}
           </div>
-          <GroupAssignments
-            value={groups}
-            onChange={setGroups}
-            disabled={busy}
-            onReady={setReady}
-          />
+          {!detailsOnly && (
+            <GroupAssignments
+              value={groups}
+              onChange={setGroups}
+              disabled={busy}
+              onReady={setReady}
+            />
+          )}
           {error && (
             <p role="alert" className="text-sm text-red-700">
               {error}

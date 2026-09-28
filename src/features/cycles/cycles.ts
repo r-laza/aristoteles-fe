@@ -147,6 +147,11 @@ export type AvailableStudent = {
   username: string;
 };
 export const cycleApi = {
+  updateDetails: (
+    id: number,
+    input: { feeId: number; name: string; startDate: string; endDate: string },
+  ) =>
+    api<CycleResponse>(`/api/admin/cycles/${id}/details`, input).then(mapCycle),
   reusablePensions: () => api<CatalogPension[]>("/api/admin/pensions"),
   savePension: (input: Omit<Pension, "id">, id?: number) =>
     api<Pension>(
@@ -158,6 +163,13 @@ export const cycleApi = {
   deleteCycle: (id: number) =>
     api<{ id: number }>(`/api/admin/cycles/${id}/delete`, {}),
   groups: (id: string) => api<CycleGroup[]>(`/api/admin/cycles/${id}/groups`),
+  addCycleGroup: (id: string, groupId: number, pensionId: number) =>
+    api<CycleGroup>(`/api/admin/cycles/${id}/groups`, { groupId, pensionId }),
+  deleteCycleGroup: (cycleId: string, groupId: number) =>
+    api<{ id: number }>(
+      `/api/admin/cycles/${cycleId}/groups/${groupId}/delete`,
+      {},
+    ),
   deleteGroup: (id: number) =>
     api<{ id: number }>(`/api/admin/groups/${id}/delete`, {}),
   reusableGroups: () => api<CatalogGroup[]>("/api/admin/groups"),
