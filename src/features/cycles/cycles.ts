@@ -132,10 +132,11 @@ export type CycleGroup = {
 };
 export type CycleEnrollment = {
   id: number;
-  student: { id: number; fullName: string; username: string };
+  student: { id: number; fullName: string; dni: string };
   group: { id: number; name: string };
   fee: EnrollmentFee;
   baseAmount: string;
+  discountPercent: string | null;
   discountAmount: string;
   discountReason: string | null;
   finalAmount: string;
@@ -144,7 +145,7 @@ export type CycleEnrollment = {
 export type AvailableStudent = {
   id: number;
   fullName: string;
-  username: string;
+  dni: string;
 };
 export const cycleApi = {
   updateDetails: (
@@ -199,8 +200,8 @@ export const cycleApi = {
     input: {
       studentId: number;
       groupId: number;
-      feeId: number;
-      discountAmount: string;
+      discountPercent: string;
+      pensionDiscountPercent: string;
       discountReason: string;
     },
   ) => api(`/api/admin/cycles/${id}/enrollments`, input),

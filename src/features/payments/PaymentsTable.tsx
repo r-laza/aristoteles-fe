@@ -84,7 +84,7 @@ function StudentIdentity({ row }: { row: PaymentRow }) {
         {row.student.fullName}
       </p>
       <p className="mt-1 break-words text-xs text-slate-400">
-        {row.student.username}
+        {row.student.dni}
       </p>
     </div>
   );

@@ -228,7 +228,7 @@ export function AcademicCycleDetailPage() {
       (enrollment) =>
         (!groupFilter || enrollment.group.id === Number(groupFilter)) &&
         normalize(
-          `${enrollment.student.fullName} ${enrollment.student.username}`,
+          `${enrollment.student.fullName} ${enrollment.student.dni}`,
         ).includes(normalize(search.trim())),
     ) ?? [];
   const pageSize = 20;
@@ -316,7 +316,7 @@ export function AcademicCycleDetailPage() {
     "cycleDetail.group",
     "cycleDetail.fee",
     "cycleDetail.assignedAmount",
-    "cycleDetail.discount",
+    "cycleDetail.discountApplied",
     "cycleDetail.total",
     "admin.status",
   ];
@@ -782,6 +782,7 @@ export function AcademicCycleDetailPage() {
             {modal === "enrollment" && (
               <EnrollmentForm
                 id={id}
+                fee={data.cycle.fee}
                 groups={data.groups}
                 onClose={() => setModal(null)}
                 onCreated={() => refresh("cycleDetail.enrolled")}

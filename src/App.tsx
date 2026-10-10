@@ -6,9 +6,12 @@ import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { LoginPage } from "./pages/LoginPage";
 import { AcademicCyclesPage } from "./pages/AcademicCyclesPage";
 import { AdminPage } from "./pages/AdminPage";
+import { AdminDashboardPage } from "./pages/AdminDashboardPage";
 import { AuthProvider } from "./auth/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { t } from "./lib/i18n";
+import { MathematicsCoursePage } from "./pages/MathematicsCoursePage";
+import { RegisterPaymentPage } from "./pages/RegisterPaymentPage";
 
 function App() {
   return (
@@ -18,6 +21,10 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute role="STUDENT" />}>
             <Route path="/" element={<DashboardPage />} />
+            <Route
+              path="/courses/mathematics"
+              element={<MathematicsCoursePage />}
+            />
             <Route
               path="/courses"
               element={
@@ -38,8 +45,12 @@ function App() {
             />
           </Route>
           <Route element={<ProtectedRoute role="ADMIN" />}>
-            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin" element={<AdminDashboardPage />} />
             <Route path="/admin/payments" element={<PaymentsPage />} />
+            <Route
+              path="/admin/payments/:enrollmentId/register"
+              element={<RegisterPaymentPage />}
+            />
             <Route path="/admin/users" element={<AdminPage />} />
             <Route path="/admin/cycles" element={<AcademicCyclesPage />} />
             <Route

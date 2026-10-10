@@ -1,15 +1,29 @@
-import { t } from '../../lib/i18n';
+import { t } from "../../lib/i18n";
+import { Link } from "react-router-dom";
 
 type CourseCardProps = {
   name: string;
   teacher: string;
   progress: number;
   image: string;
+  to?: string;
 };
 
-export function CourseCard({ name, teacher, progress, image }: CourseCardProps) {
-  return (
-    <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+export function CourseCard({
+  name,
+  teacher,
+  progress,
+  image,
+  to,
+}: CourseCardProps) {
+  const card = (
+    <article
+      className={`h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${
+        to
+          ? "transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
+          : ""
+      }`}
+    >
       <div className="h-36 overflow-hidden bg-slate-200">
         <img src={image} alt={name} className="h-full w-full object-cover" />
       </div>
@@ -25,16 +39,28 @@ export function CourseCard({ name, teacher, progress, image }: CourseCardProps) 
         </div>
 
         <div className="mt-4 h-2.5 rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-gradient-to-r from-sky-600 to-cyan-400" style={{ width: `${progress}%` }} />
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-sky-600 to-cyan-400"
+            style={{ width: `${progress}%` }}
+          />
         </div>
 
-        <button
-          type="button"
-          className="mt-4 inline-flex items-center justify-center rounded-xl bg-sky-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-900"
-        >
-          {t('dashboard.enter')}
-        </button>
+        <span className="mt-4 inline-flex items-center justify-center rounded-xl bg-sky-950 px-4 py-2 text-sm font-medium text-white transition group-hover:bg-sky-900">
+          {t("dashboard.enter")}
+        </span>
       </div>
     </article>
+  );
+
+  return to ? (
+    <Link
+      to={to}
+      className="group block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"
+      aria-label={t("dashboard.openCourse", { name })}
+    >
+      {card}
+    </Link>
+  ) : (
+    card
   );
 }

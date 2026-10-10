@@ -6,6 +6,8 @@ export type Obligation = {
   period: string | null;
   dueDate: string | null;
   amountDue: string;
+  originalAmount: string;
+  discountAmount: string;
   amountPaid: string;
   balance: string;
   status: PaymentStatus;
@@ -18,7 +20,7 @@ export type PaymentRow = {
   obligations: Obligation[];
   lastPaymentDate: string | null;
   id: number;
-  student: { fullName: string; username: string };
+  student: { fullName: string; dni: string };
   group: { id: number; name: string };
   baseAmount: string;
   discountAmount: string;
@@ -35,22 +37,67 @@ export const methods = ["CASH", "TRANSFER", "CARD", "OTHER"] as const;
 export type PaymentInput = {
   paymentType: PaymentType;
   period: string | null;
+  periods?: string[];
   amount: string;
   paymentDate: string;
   paymentMethod: string;
   reference: string;
   notes: string;
 };
+export type PaymentRegistration = {
+  payments: Payment[];
+  totalAmount: string;
+  obligationCount: number;
+};
 export type Payment = Omit<PaymentInput, "reference" | "notes"> & {
   reference: string | null;
   notes: string | null;
   id: number;
   createdAt: string;
+  receiptNumber: string | null;
+};
+export type ReceiptDocumentType = "DNI" | "CE" | "PASSPORT";
+export type ReceiptRelationship = "FATHER" | "MOTHER" | "GUARDIAN" | "OTHER";
+export type ReceiptInput = {
+  payerName: string;
+  payerDocumentType: ReceiptDocumentType;
+  payerDocumentNumber: string;
+  payerRelationship: ReceiptRelationship | "";
+};
+export type PaymentReceipt = {
+  paymentId: number;
+  receiptNumber: string;
+  generatedAt: string;
+  payer: {
+    name: string;
+    documentType: ReceiptDocumentType;
+    documentNumber: string;
+    relationship: ReceiptRelationship | null;
+  };
+  student: { name: string; group: string; cycle: string };
+  payment: {
+    date: string;
+    method: (typeof methods)[number];
+    reference: string | null;
+    amount: string;
+  };
+  obligation: {
+    paymentType: PaymentType;
+    period: string | null;
+    name: string | null;
+    originalAmount: string | null;
+    discountAmount: string;
+    paidAmount: string;
+  };
 };
 export const paymentsApi = {
   balances: (id: number) => api<Balances>(`/api/admin/payments/cycles/${id}`),
   register: (id: number, input: PaymentInput) =>
-    api<Payment>(`/api/admin/payments/enrollments/${id}`, input),
+    api<PaymentRegistration>(`/api/admin/payments/enrollments/${id}`, input),
   history: (id: number) =>
     api<Payment[]>(`/api/admin/payments/enrollments/${id}`),
+  receipt: (id: number) =>
+    api<PaymentReceipt>(`/api/admin/payments/${id}/receipt`),
+  createReceipt: (id: number, input: ReceiptInput) =>
+    api<PaymentReceipt>(`/api/admin/payments/${id}/receipt`, input),
 };

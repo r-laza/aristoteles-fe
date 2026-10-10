@@ -4,9 +4,9 @@ import { ApiError } from "../../services/api";
 import { CycleModal as Modal } from "./CycleModal";
 import {
   cycleApi,
-  feeAvailable,
   type CycleGroup,
   type AvailableStudent,
+  type EnrollmentFee,
 } from "./cycles";
 const amount = (value: number | string) =>
   t("cycles.amount", {
@@ -17,11 +17,13 @@ const amount = (value: number | string) =>
   });
 export function EnrollmentForm({
   id,
+  fee,
   groups,
   onClose,
   onCreated,
 }: {
   id: string;
+  fee: EnrollmentFee | null;
   groups: CycleGroup[];
   onClose: () => void;
   onCreated: () => void;
@@ -31,14 +33,13 @@ export function EnrollmentForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [groupId, setGroupId] = useState("");
-  const [feeId, setFeeId] = useState("");
-  const fees =
-    groups
-      .find((group) => group.id === Number(groupId))
-      ?.fees.filter((fee) => feeAvailable(fee)) ?? [];
-  const fee = fees.find((fee) => fee.id === Number(feeId));
+  const selectedGroup = groups.find((group) => group.id === Number(groupId));
+  const pension = selectedGroup?.pension ?? null;
   const baseFee = Number(fee?.amount ?? 0);
-  const [discount, setDiscount] = useState("0");
+  const pensionBase = Number(pension?.amount ?? 0);
+  const [enrollmentDiscountPercent, setEnrollmentDiscountPercent] =
+    useState("0");
+  const [pensionDiscountPercent, setPensionDiscountPercent] = useState("0");
   useEffect(() => {
     let cancelled = false;
     cycleApi
@@ -56,15 +57,27 @@ export function EnrollmentForm({
       cancelled = true;
     };
   }, [id]);
-  const finalCents =
-    Math.round(baseFee * 100) - Math.round(Number(discount || "0") * 100);
+  const calculate = (base: number, rawPercentage: string) => {
+    const baseCents = Math.round(base * 100);
+    const percentage = Number(rawPercentage || "0");
+    const discountCents = Math.round((baseCents * percentage) / 100);
+    return {
+      percentage,
+      discountCents,
+      finalCents: baseCents - discountCents,
+      valid:
+        Number.isFinite(percentage) && percentage >= 0 && percentage <= 100,
+    };
+  };
+  const enrollmentDiscount = calculate(baseFee, enrollmentDiscountPercent);
+  const pensionDiscount = calculate(pensionBase, pensionDiscountPercent);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
       !fee ||
-      !Number.isFinite(finalCents) ||
-      finalCents < 0 ||
-      Number(discount) < 0
+      !pension ||
+      !enrollmentDiscount.valid ||
+      !pensionDiscount.valid
     ) {
       setError(t("cycleDetail.invalidDiscount"));
       return;
@@ -76,8 +89,8 @@ export function EnrollmentForm({
       await cycleApi.enroll(id, {
         studentId: Number(data.get("studentId")),
         groupId: Number(groupId),
-        feeId: Number(feeId),
-        discountAmount: discount || "0",
+        discountPercent: enrollmentDiscountPercent || "0",
+        pensionDiscountPercent: pensionDiscountPercent || "0",
         discountReason: String(data.get("discountReason")).trim(),
       });
       onCreated();
@@ -119,7 +132,7 @@ export function EnrollmentForm({
                   <option key={student.id} value={student.id}>
                     {t("cycleDetail.studentOption", {
                       name: student.fullName,
-                      username: student.username,
+                      dni: student.dni,
                     })}
                   </option>
                 ))}
@@ -139,10 +152,7 @@ export function EnrollmentForm({
                 name="groupId"
                 required
                 value={groupId}
-                onChange={(event) => {
-                  setGroupId(event.target.value);
-                  setFeeId("");
-                }}
+                onChange={(event) => setGroupId(event.target.value)}
                 className="field"
               >
                 <option value="" disabled>
@@ -155,61 +165,141 @@ export function EnrollmentForm({
                 ))}
               </select>
             </div>
-            <div>
-              <label htmlFor="enroll-fee" className="field-label">
-                {t("cycleDetail.fee")}
-              </label>
-              <select
-                id="enroll-fee"
-                required
-                value={feeId}
-                onChange={(event) => setFeeId(event.target.value)}
-                className="field"
-              >
-                <option value="" disabled>
-                  {t("cycleDetail.selectFee")}
-                </option>
-                {fees.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {t("cycleDetail.feeOption", {
-                      name: option.name,
-                      amount: amount(option.amount),
-                    })}
-                  </option>
-                ))}
-              </select>
-              {groupId && fees.length === 0 && (
-                <p className="mt-2 text-sm text-slate-500">
-                  {t("cycleDetail.noActiveFees")}
-                </p>
-              )}
-            </div>
-            <div>
-              <label htmlFor="enroll-base" className="field-label">
-                {t("cycleDetail.assignedAmount")}
-              </label>
-              <input
-                id="enroll-base"
-                readOnly
-                value={amount(baseFee)}
-                className="field bg-slate-50"
-              />
-            </div>
-            <div>
-              <label htmlFor="enroll-discount" className="field-label">
-                {t("cycleDetail.discount")}
-              </label>
-              <input
-                id="enroll-discount"
-                type="number"
-                min="0"
-                max={baseFee}
-                step="0.01"
-                value={discount}
-                onChange={(event) => setDiscount(event.target.value)}
-                className="field"
-              />
-            </div>
+            <section className="space-y-4 rounded-xl border border-slate-200 p-4">
+              <div>
+                <h3 className="font-semibold text-sky-950">
+                  {t("cycleDetail.enrollmentFee")}
+                </h3>
+                {fee ? (
+                  <p className="mt-1 text-sm text-slate-600">
+                    {fee.name} ·{" "}
+                    {t("cycleDetail.value", { value: amount(baseFee) })}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">
+                    {t("cycleDetail.noCycleFee")}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="enroll-discount" className="field-label">
+                  {t("cycleDetail.enrollmentDiscountPercent")}
+                </label>
+                <input
+                  id="enroll-discount"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={enrollmentDiscountPercent}
+                  onChange={(event) =>
+                    setEnrollmentDiscountPercent(event.target.value)
+                  }
+                  className="field"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="field-label">
+                    {t("cycleDetail.discountApplied")}
+                  </label>
+                  <input
+                    readOnly
+                    value={
+                      enrollmentDiscount.valid
+                        ? amount(enrollmentDiscount.discountCents / 100)
+                        : t("cycleDetail.invalidDiscount")
+                    }
+                    className="field bg-slate-50"
+                  />
+                </div>
+                <div>
+                  <label className="field-label">
+                    {t("cycleDetail.totalEnrollment")}
+                  </label>
+                  <input
+                    readOnly
+                    value={
+                      enrollmentDiscount.valid
+                        ? amount(enrollmentDiscount.finalCents / 100)
+                        : t("cycleDetail.invalidDiscount")
+                    }
+                    className="field bg-sky-50 font-semibold"
+                  />
+                </div>
+              </div>
+            </section>
+            {pension && (
+              <section className="space-y-4 rounded-xl border border-slate-200 p-4">
+                <div>
+                  <h3 className="font-semibold text-sky-950">
+                    {t("cycleDetail.pension")}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600">{pension.name}</p>
+                  <dl className="mt-2 grid gap-1 text-sm text-slate-600 sm:grid-cols-2">
+                    <div>
+                      <dt className="inline">
+                        {t("cycleDetail.monthlyValue")}:{" "}
+                      </dt>
+                      <dd className="inline font-medium">
+                        {amount(pensionBase)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="inline">{t("cycleDetail.dueDay")}: </dt>
+                      <dd className="inline font-medium">{pension.dueDay}</dd>
+                    </div>
+                  </dl>
+                </div>
+                <div>
+                  <label htmlFor="pension-discount" className="field-label">
+                    {t("cycleDetail.pensionDiscountPercent")}
+                  </label>
+                  <input
+                    id="pension-discount"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={pensionDiscountPercent}
+                    onChange={(event) =>
+                      setPensionDiscountPercent(event.target.value)
+                    }
+                    className="field"
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="field-label">
+                      {t("cycleDetail.discountApplied")}
+                    </label>
+                    <input
+                      readOnly
+                      value={
+                        pensionDiscount.valid
+                          ? amount(pensionDiscount.discountCents / 100)
+                          : t("cycleDetail.invalidDiscount")
+                      }
+                      className="field bg-slate-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="field-label">
+                      {t("cycleDetail.monthlyTotal")}
+                    </label>
+                    <input
+                      readOnly
+                      value={
+                        pensionDiscount.valid
+                          ? amount(pensionDiscount.finalCents / 100)
+                          : t("cycleDetail.invalidDiscount")
+                      }
+                      className="field bg-sky-50 font-semibold"
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
             <div>
               <label htmlFor="enroll-reason" className="field-label">
                 {t("cycleDetail.discountReason")}
@@ -219,21 +309,6 @@ export function EnrollmentForm({
                 name="discountReason"
                 maxLength={500}
                 className="field"
-              />
-            </div>
-            <div>
-              <label htmlFor="enroll-final" className="field-label">
-                {t("cycleDetail.total")}
-              </label>
-              <input
-                id="enroll-final"
-                readOnly
-                value={
-                  Number.isFinite(finalCents) && finalCents >= 0
-                    ? amount(finalCents / 100)
-                    : t("cycleDetail.invalidDiscount")
-                }
-                className="field bg-sky-50 font-semibold"
               />
             </div>
           </fieldset>
@@ -252,7 +327,14 @@ export function EnrollmentForm({
               {t("admin.cancel")}
             </button>
             <button
-              disabled={busy || !fee || students.length === 0 || finalCents < 0}
+              disabled={
+                busy ||
+                !fee ||
+                !pension ||
+                students.length === 0 ||
+                !enrollmentDiscount.valid ||
+                !pensionDiscount.valid
+              }
               className="primary-button"
             >
               {t(busy ? "admin.saving" : "cycleDetail.enroll")}

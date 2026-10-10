@@ -6,18 +6,22 @@ import { PaymentFilters } from "./PaymentFilters";
 import { PaymentSummary } from "./PaymentSummary";
 import { PaymentsTable } from "./PaymentsTable";
 import { PaymentHistory } from "./PaymentHistory";
-import { RegisterPayment } from "./RegisterPayment";
 import { emptyFilters, filterPaymentRows } from "./paymentView";
 import { useCyclePayments } from "./useCyclePayments";
 
-export function CyclePayments({ cycleId }: { cycleId: number }) {
+export function CyclePayments({
+  cycleId,
+  initialSuccess = false,
+  onRegister,
+}: {
+  cycleId: number;
+  initialSuccess?: boolean;
+  onRegister: (row: PaymentRow) => void;
+}) {
   const { data, loading, error, refresh } = useCyclePayments(cycleId);
   const [filters, setFilters] = useState(emptyFilters);
-  const [success, setSuccess] = useState(false);
-  const [selected, setSelected] = useState<{
-    row: PaymentRow;
-    mode: "register" | "history";
-  } | null>(null);
+  const [success, setSuccess] = useState(initialSuccess);
+  const [selected, setSelected] = useState<PaymentRow | null>(null);
   if (loading)
     return (
       <p role="status" className="py-8 text-sm text-slate-500">
@@ -114,29 +118,15 @@ export function CyclePayments({ cycleId }: { cycleId: number }) {
             rows={rows}
             onRegister={(row) => {
               setSuccess(false);
-              setSelected({ row, mode: "register" });
+              onRegister(row);
             }}
-            onHistory={(row) => setSelected({ row, mode: "history" })}
+            onHistory={setSelected}
           />
         )}
       </section>
-      {selected &&
-        (selected.mode === "history" ? (
-          <PaymentHistory
-            row={selected.row}
-            onClose={() => setSelected(null)}
-          />
-        ) : (
-          <RegisterPayment
-            row={selected.row}
-            onClose={() => setSelected(null)}
-            onSaved={() => {
-              setSelected(null);
-              setSuccess(true);
-              refresh();
-            }}
-          />
-        ))}
+      {selected && (
+        <PaymentHistory row={selected} onClose={() => setSelected(null)} />
+      )}
     </>
   );
 }

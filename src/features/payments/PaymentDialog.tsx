@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { t } from "../../lib/i18n";
 export function PaymentDialog({
@@ -13,21 +13,22 @@ export function PaymentDialog({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     ref.current?.showModal();
   }, []);
   return (
     <dialog
       ref={ref}
-      aria-labelledby="payment-title"
+      aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();
         if (!busy) onClose();
       }}
-      className="w-[calc(100%-2rem)] max-w-xl rounded-2xl p-6 text-slate-800 shadow-xl backdrop:bg-slate-950/50"
+      className="w-[calc(100%-2rem)] max-w-2xl rounded-2xl p-6 text-slate-800 shadow-xl backdrop:bg-slate-950/50"
     >
       <div className="mb-6 flex items-center justify-between gap-4">
-        <h2 id="payment-title" className="text-xl font-bold text-sky-950">
+        <h2 id={titleId} className="text-xl font-bold text-sky-950">
           {title}
         </h2>
         <button

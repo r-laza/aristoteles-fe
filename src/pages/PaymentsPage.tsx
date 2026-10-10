@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { t } from "../lib/i18n";
 import {
@@ -9,6 +10,9 @@ import {
 } from "../features/cycles/cycles";
 import { CyclePayments } from "../features/payments/CyclePayments";
 export function PaymentsPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [cycles, setCycles] = useState<AcademicCycle[]>([]);
   const [cycleId, setCycleId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,7 +25,12 @@ export function PaymentsPage() {
         if (!cancelled) {
           const sorted = orderCycles(list, todayKey());
           setCycles(sorted);
-          setCycleId(sorted[0]?.id ?? null);
+          const requestedCycle = Number(searchParams.get("cycleId"));
+          setCycleId(
+            sorted.some((cycle) => cycle.id === requestedCycle)
+              ? requestedCycle
+              : (sorted[0]?.id ?? null),
+          );
           setError(false);
         }
       })
@@ -34,7 +43,7 @@ export function PaymentsPage() {
     return () => {
       cancelled = true;
     };
-  }, [version]);
+  }, [version, searchParams]);
   return (
     <AppLayout
       banner={{
@@ -73,7 +82,11 @@ export function PaymentsPage() {
               <select
                 id="payments-cycle"
                 value={cycleId ?? ""}
-                onChange={(event) => setCycleId(Number(event.target.value))}
+                onChange={(event) => {
+                  const nextCycleId = Number(event.target.value);
+                  setCycleId(nextCycleId);
+                  setSearchParams({ cycleId: String(nextCycleId) });
+                }}
                 className="field"
               >
                 {cycles.map((cycle) => (
@@ -84,7 +97,19 @@ export function PaymentsPage() {
               </select>
             </div>
             {cycleId !== null && (
-              <CyclePayments key={cycleId} cycleId={cycleId} />
+              <CyclePayments
+                key={cycleId}
+                cycleId={cycleId}
+                initialSuccess={Boolean(
+                  (location.state as { paymentRegistered?: boolean } | null)
+                    ?.paymentRegistered,
+                )}
+                onRegister={(row) =>
+                  navigate(
+                    `/admin/payments/${row.id}/register?cycleId=${cycleId}`,
+                  )
+                }
+              />
             )}
           </>
         )}
