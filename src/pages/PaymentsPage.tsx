@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { UserPlus } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { t } from "../lib/i18n";
@@ -45,12 +46,7 @@ export function PaymentsPage() {
     };
   }, [version, searchParams]);
   return (
-    <AppLayout
-      banner={{
-        src: "/images/banner-aristoteles.png",
-        alt: t("dashboard.bannerAlt"),
-      }}
-    >
+    <AppLayout>
       <div className="py-5">
         <h1 className="text-3xl font-bold tracking-tight text-sky-950">
           {t("payments.title")}
@@ -75,26 +71,41 @@ export function PaymentsPage() {
           <p className="rounded-2xl bg-white p-6">{t("payments.noCycles")}</p>
         ) : (
           <>
-            <div className="max-w-md">
-              <label htmlFor="payments-cycle" className="field-label">
-                {t("payments.cycle")}
-              </label>
-              <select
-                id="payments-cycle"
-                value={cycleId ?? ""}
-                onChange={(event) => {
-                  const nextCycleId = Number(event.target.value);
-                  setCycleId(nextCycleId);
-                  setSearchParams({ cycleId: String(nextCycleId) });
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end">
+              <div className="w-full max-w-md">
+                <label htmlFor="payments-cycle" className="field-label">
+                  {t("payments.cycle")}
+                </label>
+                <select
+                  id="payments-cycle"
+                  value={cycleId ?? ""}
+                  onChange={(event) => {
+                    const nextCycleId = Number(event.target.value);
+                    setCycleId(nextCycleId);
+                    setSearchParams({ cycleId: String(nextCycleId) });
+                  }}
+                  className="field"
+                >
+                  {cycles.map((cycle) => (
+                    <option key={cycle.id} value={cycle.id}>
+                      {cycle.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                disabled={cycleId === null}
+                onClick={() => {
+                  if (cycleId !== null) {
+                    navigate(`/admin/cycles/${cycleId}/enrollments`);
+                  }
                 }}
-                className="field"
+                className="primary-button inline-flex min-h-12 items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {cycles.map((cycle) => (
-                  <option key={cycle.id} value={cycle.id}>
-                    {cycle.name}
-                  </option>
-                ))}
-              </select>
+                <UserPlus size={18} aria-hidden="true" />
+                {t("payments.enrollStudent")}
+              </button>
             </div>
             {cycleId !== null && (
               <CyclePayments
@@ -106,7 +117,7 @@ export function PaymentsPage() {
                 )}
                 onRegister={(row) =>
                   navigate(
-                    `/admin/payments/${row.id}/register?cycleId=${cycleId}`,
+                    `/admin/payments/${row.id}/manage?cycleId=${cycleId}`,
                   )
                 }
               />

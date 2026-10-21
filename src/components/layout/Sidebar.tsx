@@ -8,6 +8,8 @@ import {
   House,
   UserRound,
   ClipboardList,
+  UsersRound,
+  ReceiptText,
   ChevronLeft,
   ChevronRight,
   X,
@@ -47,6 +49,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   label: t("navigation.users"),
                   icon: Users,
                   to: "/admin/users",
+                },
+                {
+                  label: t("navigation.groups"),
+                  icon: UsersRound,
+                  to: "/admin/groups",
+                },
+                {
+                  label: t("navigation.enrollmentsPensions"),
+                  icon: ReceiptText,
+                  to: "/admin/enrollments-pensions",
                 },
                 {
                   label: t("navigation.cycles"),

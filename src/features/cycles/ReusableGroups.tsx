@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Pencil, Search, Trash2, Users } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { t } from "../../lib/i18n";
 import { ApiError } from "../../services/api";
 import { CycleModal } from "./CycleModal";
 import { GroupForm } from "./GroupForms";
 import { cycleApi, type CatalogGroup } from "./cycles";
 
-function DeleteGroupModal({
+export function DeleteGroupModal({
   group,
   onClose,
   onDeleted,
@@ -80,7 +81,12 @@ function DeleteGroupModal({
   );
 }
 
-export function ReusableGroups() {
+export function ReusableGroups({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+}) {
+  const navigate = useNavigate();
   const [groups, setGroups] = useState<CatalogGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -158,14 +164,14 @@ export function ReusableGroups() {
     );
   return (
     <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-sky-950">
-          {t("cycles.groups")}
-        </h2>
-        <p className="mt-2 text-sm text-slate-500">
-          {t("cycleDetail.reusableDescription")}
-        </p>
-      </div>
+      {showHeader && (
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-sky-950">
+            {t("groups.title")}
+          </h2>
+          <p className="mt-2 text-sm text-slate-500">{t("groups.subtitle")}</p>
+        </div>
+      )}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="relative w-full sm:max-w-sm">
           <Search
@@ -238,7 +244,13 @@ export function ReusableGroups() {
                     <Users size={22} aria-hidden="true" />
                   </div>
                   <h3 className="min-w-0 break-words text-lg font-semibold text-sky-950">
-                    {group.name}
+                    <Link
+                      to={`/admin/groups/${group.id}`}
+                      state={{ group }}
+                      className="hover:text-sky-700"
+                    >
+                      {group.name}
+                    </Link>
                   </h3>
                 </div>
                 {actions(group)}
@@ -264,7 +276,13 @@ export function ReusableGroups() {
         <GroupForm
           group={editing ?? undefined}
           onClose={() => setEditing(undefined)}
-          onCreated={() => {
+          onCreated={(saved) => {
+            if (editing === null) {
+              navigate(`/admin/groups/${saved.id}`, {
+                state: { group: saved, created: true },
+              });
+              return;
+            }
             setEditing(undefined);
             setLoading(true);
             setVersion((v) => v + 1);

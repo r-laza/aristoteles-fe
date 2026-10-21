@@ -32,10 +32,6 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function AdminDashboardPage() {
-  const banner = {
-    src: "/images/banner-aristoteles.png",
-    alt: t("dashboard.bannerAlt"),
-  };
   const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(
     null,
   );
@@ -90,7 +86,7 @@ export function AdminDashboardPage() {
 
   if (loading && cycles.length === 0 && selectedCycleId === null && !error)
     return (
-      <AppLayout banner={banner}>
+      <AppLayout>
         <p role="status" className="py-16 text-center text-slate-500">
           {t("adminDashboard.loading")}
         </p>
@@ -128,7 +124,7 @@ export function AdminDashboardPage() {
     : [];
 
   return (
-    <AppLayout banner={banner}>
+    <AppLayout>
       <div className="py-5">
         <header>
           <h1 className="text-3xl font-bold tracking-tight text-sky-950">

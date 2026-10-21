@@ -37,8 +37,6 @@ export function DashboardPage() {
     void loadDashboard();
   }, []);
 
-  const bannerImage = "/images/banner-aristoteles.png";
-
   const summaryCards = useMemo(() => {
     if (!dashboard) {
       return [];
@@ -111,7 +109,6 @@ export function DashboardPage() {
     <AppLayout
       studentName={dashboard.student.name}
       initials={dashboard.student.initials}
-      banner={{ src: bannerImage, alt: t("dashboard.bannerAlt") }}
     >
       <div className="w-full">
         {/* Main dashboard layout */}

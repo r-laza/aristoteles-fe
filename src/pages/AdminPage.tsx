@@ -25,7 +25,7 @@ import { t } from "../lib/i18n";
 type TabRole = "STUDENT" | "TEACHER" | "ADMIN";
 type StudentInput = Extract<CreatePersonInput, { role: "STUDENT" }>;
 
-function Modal({
+export function Modal({
   title,
   onClose,
   busy = false,
@@ -157,14 +157,14 @@ function FormActions({
   );
 }
 
-function StudentForm({
+export function StudentForm({
   student,
   onClose,
   onSaved,
 }: {
   student?: Person;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (student: Person) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -186,6 +186,10 @@ function StudentForm({
       birthDate: value("birthDate"),
       gender: value("gender") as StudentInput["gender"],
       representativeName: value("representativeName"),
+      representativeDocumentType: value(
+        "representativeDocumentType",
+      ) as StudentInput["representativeDocumentType"],
+      representativeDocumentNumber: value("representativeDocumentNumber"),
       relationship: value("relationship") as StudentInput["relationship"],
       relationshipOther: value("relationshipOther") || undefined,
       primaryPhone: value("primaryPhone"),
@@ -196,6 +200,7 @@ function StudentForm({
       password: !student && access ? String(data.get("password")) : undefined,
     };
     try {
+      let saved: Person;
       if (student) {
         const {
           role: _role,
@@ -204,9 +209,9 @@ function StudentForm({
           password: _password,
           ...details
         } = input;
-        await peopleApi.updateStudent(student.id, details);
-      } else await peopleApi.create(input);
-      onSaved();
+        saved = await peopleApi.updateStudent(student.id, details);
+      } else saved = await peopleApi.create(input);
+      onSaved(saved);
     } catch (cause) {
       setError(
         t(
@@ -267,6 +272,30 @@ function StudentForm({
           name="representativeName"
           defaultValue={student?.representativeName}
         />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="representativeDocumentType" className="field-label">
+              {t("admin.representativeDocumentType")}
+            </label>
+            <select
+              id="representativeDocumentType"
+              name="representativeDocumentType"
+              defaultValue={student?.representativeDocumentType ?? "DNI"}
+              className="field"
+            >
+              {(["DNI", "CE", "PASSPORT"] as const).map((type) => (
+                <option key={type} value={type}>
+                  {t(`receipts.documentTypes.${type}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Field
+            label={t("admin.representativeDocumentNumber")}
+            name="representativeDocumentNumber"
+            defaultValue={student?.representativeDocumentNumber}
+          />
+        </div>
         <div>
           <label htmlFor="relationship" className="field-label">
             {t("admin.relationship")}
@@ -901,12 +930,7 @@ export function AdminPage() {
   const current = people.filter((person) => person.role === tab);
   const tabs: TabRole[] = ["STUDENT", "TEACHER", "ADMIN"];
   return (
-    <AppLayout
-      banner={{
-        src: "/images/banner-aristoteles.png",
-        alt: t("dashboard.bannerAlt"),
-      }}
-    >
+    <AppLayout>
       <div className="py-5">
         <h1 className="text-3xl font-bold tracking-tight text-sky-950">
           {t("admin.peopleTitle")}

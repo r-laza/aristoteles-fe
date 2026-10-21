@@ -29,3 +29,21 @@ export async function api<T>(path: string, body?: unknown): Promise<T> {
     ? (undefined as T)
     : (response.json() as Promise<T>);
 }
+
+export async function apiForm<T>(path: string, body: FormData): Promise<T> {
+  const response = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      "X-Requested-With": "Aristoteles",
+    },
+    body,
+  });
+  if (!response.ok) {
+    if (response.status === 401)
+      window.dispatchEvent(new Event("auth-expired"));
+    throw new ApiError(response.status);
+  }
+  return response.json() as Promise<T>;
+}

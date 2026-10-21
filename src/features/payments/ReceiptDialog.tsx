@@ -19,16 +19,29 @@ const relationships: ReceiptRelationship[] = [
 
 export function ReceiptDialog({
   payment,
+  defaultPayer,
   onClose,
   onGenerated,
 }: {
   payment: Payment;
+  defaultPayer?: {
+    name: string;
+    documentType: ReceiptDocumentType | null;
+    documentNumber: string | null;
+    relationship: ReceiptRelationship | "";
+    relationshipOther?: string | null;
+  };
   onClose: () => void;
   onGenerated: (receipt: PaymentReceipt) => void | Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [documentType, setDocumentType] = useState<ReceiptDocumentType>("DNI");
+  const [documentType, setDocumentType] = useState<ReceiptDocumentType>(
+    defaultPayer?.documentType ?? "DNI",
+  );
+  const [relationship, setRelationship] = useState<ReceiptRelationship | "">(
+    defaultPayer?.relationship ?? "",
+  );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,8 +49,9 @@ export function ReceiptDialog({
     const data = new FormData(event.currentTarget);
     const payerName = String(data.get("payerName")).trim();
     const payerDocumentNumber = String(data.get("payerDocumentNumber")).trim();
-    const payerRelationship = String(data.get("payerRelationship")) as
-      ReceiptRelationship | "";
+    const payerRelationshipOther = String(
+      data.get("payerRelationshipOther") ?? "",
+    ).trim();
     if (!payerName || !documentType || !payerDocumentNumber) {
       setError(t("receipts.requiredFields"));
       return;
@@ -58,7 +72,8 @@ export function ReceiptDialog({
           payerName,
           payerDocumentType: documentType,
           payerDocumentNumber,
-          payerRelationship,
+          payerRelationship: relationship,
+          payerRelationshipOther,
         }),
       );
     } catch {
@@ -103,6 +118,7 @@ export function ReceiptDialog({
             <input
               id="receipt-document-number"
               name="payerDocumentNumber"
+              defaultValue={defaultPayer?.documentNumber ?? ""}
               maxLength={30}
               required
               className="field"
@@ -115,6 +131,7 @@ export function ReceiptDialog({
             <input
               id="receipt-payer-name"
               name="payerName"
+              defaultValue={defaultPayer?.name ?? ""}
               maxLength={150}
               required
               className="field"
@@ -127,16 +144,39 @@ export function ReceiptDialog({
             <select
               id="receipt-relationship"
               name="payerRelationship"
+              value={relationship}
+              onChange={(event) =>
+                setRelationship(event.target.value as ReceiptRelationship | "")
+              }
               className="field"
             >
               <option value="">{t("receipts.selectOption")}</option>
               {relationships.map((relationship) => (
                 <option key={relationship} value={relationship}>
-                  {t(`receipts.relationships.${relationship}`)}
+                  {relationship === "OTHER" && defaultPayer?.relationshipOther
+                    ? defaultPayer.relationshipOther
+                    : t(`receipts.relationships.${relationship}`)}
                 </option>
               ))}
             </select>
           </div>
+          {relationship === "OTHER" && (
+            <div>
+              <label
+                htmlFor="receipt-relationship-other"
+                className="field-label"
+              >
+                {t("receipts.relationshipOther")}
+              </label>
+              <input
+                id="receipt-relationship-other"
+                name="payerRelationshipOther"
+                defaultValue={defaultPayer?.relationshipOther ?? ""}
+                maxLength={100}
+                className="field"
+              />
+            </div>
+          )}
         </fieldset>
         {error && (
           <p role="alert" className="text-sm text-red-700">

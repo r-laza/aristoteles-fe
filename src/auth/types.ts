@@ -24,6 +24,8 @@ export type Person = {
   birthDate?: string;
   gender?: "MALE" | "FEMALE" | "OTHER";
   representativeName?: string;
+  representativeDocumentType?: "DNI" | "CE" | "PASSPORT";
+  representativeDocumentNumber?: string;
   relationship?: "FATHER" | "MOTHER" | "OTHER";
   relationshipOther?: string | null;
   primaryPhone?: string;

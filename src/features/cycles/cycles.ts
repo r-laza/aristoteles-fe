@@ -140,6 +140,7 @@ export type CycleEnrollment = {
   discountAmount: string;
   discountReason: string | null;
   finalAmount: string;
+  pensionAmount: string | null;
   status: "ACTIVE";
 };
 export type AvailableStudent = {
@@ -204,7 +205,7 @@ export const cycleApi = {
       pensionDiscountPercent: string;
       discountReason: string;
     },
-  ) => api(`/api/admin/cycles/${id}/enrollments`, input),
+  ) => api<CycleEnrollment>(`/api/admin/cycles/${id}/enrollments`, input),
 };
 export function formatCycleDate(value: string): string {
   const [year, month, day] = value.split("-");

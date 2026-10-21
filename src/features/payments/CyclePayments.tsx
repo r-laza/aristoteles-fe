@@ -5,7 +5,6 @@ import type { PaymentRow } from "../../services/payments.api";
 import { PaymentFilters } from "./PaymentFilters";
 import { PaymentSummary } from "./PaymentSummary";
 import { PaymentsTable } from "./PaymentsTable";
-import { PaymentHistory } from "./PaymentHistory";
 import { emptyFilters, filterPaymentRows } from "./paymentView";
 import { useCyclePayments } from "./useCyclePayments";
 
@@ -21,7 +20,6 @@ export function CyclePayments({
   const { data, loading, error, refresh } = useCyclePayments(cycleId);
   const [filters, setFilters] = useState(emptyFilters);
   const [success, setSuccess] = useState(initialSuccess);
-  const [selected, setSelected] = useState<PaymentRow | null>(null);
   if (loading)
     return (
       <p role="status" className="py-8 text-sm text-slate-500">
@@ -120,13 +118,9 @@ export function CyclePayments({
               setSuccess(false);
               onRegister(row);
             }}
-            onHistory={setSelected}
           />
         )}
       </section>
-      {selected && (
-        <PaymentHistory row={selected} onClose={() => setSelected(null)} />
-      )}
     </>
   );
 }

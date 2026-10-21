@@ -5,7 +5,10 @@ import {
   paymentsApi,
   methods,
   type Obligation,
+  type PaymentRegistration,
   type PaymentRow,
+  type ReceiptDocumentType,
+  type ReceiptRelationship,
 } from "../../services/payments.api";
 import { ApiError } from "../../services/api";
 import { money, periodLabel } from "./formatting";
@@ -24,10 +27,18 @@ export function RegisterPayment({
 }: {
   row: PaymentRow;
   onCancel: () => void;
-  onSaved: () => void;
+  onSaved: (registration: PaymentRegistration) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [documentType, setDocumentType] = useState<ReceiptDocumentType>(
+    row.student.representativeDocumentType ?? "DNI",
+  );
+  const [payerRelationship, setPayerRelationship] =
+    useState<ReceiptRelationship>(row.student.relationship);
+  const [paymentMethod, setPaymentMethod] = useState<(typeof methods)[number]>(
+    "CASH",
+  );
   const pending = useMemo(
     () => row.obligations.filter((charge) => Number(charge.balance) > 0),
     [row.obligations],
@@ -94,10 +105,35 @@ export function RegisterPayment({
       return;
     }
     const first = selectedCharges[0];
+    const payerName = String(data.get("payerName")).trim();
+    const payerDocumentNumber = String(data.get("payerDocumentNumber")).trim();
+    const payerRelationshipOther = String(
+      data.get("payerRelationshipOther") ?? "",
+    ).trim();
+    const evidence = data.get("evidence");
+    if (
+      evidence instanceof File &&
+      evidence.size > 0 &&
+      (evidence.size > 5 * 1024 * 1024 ||
+        !["image/jpeg", "image/png", "application/pdf"].includes(
+          evidence.type,
+        ))
+    ) {
+      setError(t("payments.invalidEvidence"));
+      return;
+    }
+    const validDocument =
+      documentType === "DNI"
+        ? /^\d{8}$/.test(payerDocumentNumber)
+        : /^[A-Za-z0-9]{6,12}$/.test(payerDocumentNumber);
+    if (!payerName || !validDocument) {
+      setError(t("receipts.invalidPayerInformation"));
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      await paymentsApi.register(row.id, {
+      const registration = await paymentsApi.register(row.id, {
         paymentType: first.paymentType,
         period: multiple ? null : first.period,
         ...(multiple
@@ -105,11 +141,30 @@ export function RegisterPayment({
           : {}),
         amount,
         paymentDate: String(data.get("paymentDate")),
-        paymentMethod: String(data.get("paymentMethod")),
-        reference: String(data.get("reference")).trim(),
+        paymentMethod,
+        reference: String(data.get("reference") ?? "").trim(),
         notes: String(data.get("notes")).trim(),
+        payerName,
+        payerDocumentType: documentType,
+        payerDocumentNumber,
+        payerRelationship,
+        payerRelationshipOther,
       });
-      onSaved();
+      if (
+        evidence instanceof File &&
+        evidence.size > 0 &&
+        registration.payments[0]
+      ) {
+        try {
+          registration.payments[0] = await paymentsApi.uploadEvidence(
+            registration.payments[0].id,
+            evidence,
+          );
+        } catch {
+          registration.evidenceUploadFailed = true;
+        }
+      }
+      onSaved(registration);
     } catch (cause) {
       setError(
         t(
@@ -146,9 +201,104 @@ export function RegisterPayment({
             </div>
           ))}
         </div>
+        <fieldset disabled={busy} className="mt-4 rounded-xl bg-slate-50 p-4">
+          <legend className="text-sm font-semibold text-sky-950">
+            {t("receipts.payerInformation")}
+          </legend>
+          <p className="mt-1 text-xs text-slate-500">
+            {t("receipts.payerSnapshotHelp")}
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label htmlFor="payer-name" className="field-label">
+                {t("admin.representativeName")}
+              </label>
+              <input
+                id="payer-name"
+                name="payerName"
+                required
+                defaultValue={row.student.representativeName}
+                className="field bg-white"
+              />
+            </div>
+            <div>
+              <label htmlFor="payer-document-type" className="field-label">
+                {t("receipts.documentType")}
+              </label>
+              <select
+                id="payer-document-type"
+                name="payerDocumentType"
+                value={documentType}
+                onChange={(event) =>
+                  setDocumentType(event.target.value as ReceiptDocumentType)
+                }
+                className="field bg-white"
+              >
+                {(["DNI", "CE", "PASSPORT"] as const).map((type) => (
+                  <option key={type} value={type}>
+                    {t(`receipts.documentTypes.${type}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="payer-document-number" className="field-label">
+                {t("receipts.documentNumber")}
+              </label>
+              <input
+                id="payer-document-number"
+                name="payerDocumentNumber"
+                required
+                defaultValue={row.student.representativeDocumentNumber ?? ""}
+                className="field bg-white"
+              />
+            </div>
+            <div>
+              <label htmlFor="payer-relationship" className="field-label">
+                {t("receipts.relationshipPdf")}
+              </label>
+              <select
+                id="payer-relationship"
+                name="payerRelationship"
+                value={payerRelationship}
+                onChange={(event) =>
+                  setPayerRelationship(
+                    event.target.value as ReceiptRelationship,
+                  )
+                }
+                className="field bg-white"
+              >
+                {(["FATHER", "MOTHER", "GUARDIAN", "OTHER"] as const).map(
+                  (relationship) => (
+                    <option key={relationship} value={relationship}>
+                      {t(`receipts.relationships.${relationship}`)}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+            {payerRelationship === "OTHER" && (
+              <div>
+                <label
+                  htmlFor="payer-relationship-other"
+                  className="field-label"
+                >
+                  {t("receipts.relationshipOther")}
+                </label>
+                <input
+                  id="payer-relationship-other"
+                  name="payerRelationshipOther"
+                  defaultValue={row.student.relationshipOther ?? ""}
+                  maxLength={100}
+                  className="field bg-white"
+                />
+              </div>
+            )}
+          </div>
+        </fieldset>
       </section>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.85fr)]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.8fr)_minmax(360px,0.8fr)] xl:gap-8">
         <fieldset
           disabled={busy}
           className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
@@ -338,6 +488,12 @@ export function RegisterPayment({
                 id="payment-method"
                 name="paymentMethod"
                 required
+                value={paymentMethod}
+                onChange={(event) =>
+                  setPaymentMethod(
+                    event.target.value as (typeof methods)[number],
+                  )
+                }
                 className="field"
               >
                 {methods.map((method) => (
@@ -348,16 +504,33 @@ export function RegisterPayment({
               </select>
             </div>
           </div>
+          {paymentMethod !== "CASH" && (
+            <div>
+              <label htmlFor="payment-reference" className="field-label">
+                {t("payments.operationReference")}
+              </label>
+              <input
+                id="payment-reference"
+                name="reference"
+                maxLength={200}
+                className="field"
+              />
+            </div>
+          )}
           <div>
-            <label htmlFor="payment-reference" className="field-label">
-              {t("payments.reference")}
+            <label htmlFor="payment-evidence" className="field-label">
+              {t("payments.attachEvidence")}
             </label>
             <input
-              id="payment-reference"
-              name="reference"
-              maxLength={200}
-              className="field"
+              id="payment-evidence"
+              name="evidence"
+              type="file"
+              accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+              className="field file:mr-3 file:rounded-lg file:border-0 file:bg-sky-50 file:px-3 file:py-2 file:font-semibold file:text-sky-800"
             />
+            <p className="mt-1 text-xs text-slate-500">
+              {t("payments.evidenceHelp")}
+            </p>
           </div>
           <div>
             <label htmlFor="payment-notes" className="field-label">

@@ -66,7 +66,7 @@ function amountInWords(value: string) {
   return result.charAt(0).toUpperCase() + result.slice(1);
 }
 
-export async function downloadReceiptPdf(receipt: PaymentReceipt) {
+async function createReceiptPdf(receipt: PaymentReceipt) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const left = 20;
@@ -150,7 +150,9 @@ export async function downloadReceiptPdf(receipt: PaymentReceipt) {
   if (receipt.payer.relationship)
     row(
       t("receipts.relationshipPdf"),
-      t(`receipts.relationships.${receipt.payer.relationship}`),
+      receipt.payer.relationship === "OTHER" && receipt.payer.relationshipOther
+        ? receipt.payer.relationshipOther
+        : t(`receipts.relationships.${receipt.payer.relationship}`),
     );
 
   heading(t("receipts.studentInformation"));
@@ -234,5 +236,15 @@ export async function downloadReceiptPdf(receipt: PaymentReceipt) {
   doc.text(t("receipts.academy"), left, 278);
   doc.setFont("helvetica", "normal");
   doc.text(t("receipts.generatedBySystem"), left, 284);
+  return doc;
+}
+
+export async function downloadReceiptPdf(receipt: PaymentReceipt) {
+  const doc = await createReceiptPdf(receipt);
   doc.save(t("receipts.fileName", { number: receipt.receiptNumber }));
+}
+
+export async function viewReceiptPdf(receipt: PaymentReceipt) {
+  const doc = await createReceiptPdf(receipt);
+  window.open(doc.output("bloburl"), "_blank", "noopener,noreferrer");
 }

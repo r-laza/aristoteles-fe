@@ -1,4 +1,4 @@
-import { History, Wallet } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { t } from "../../lib/i18n";
 import { todayKey } from "../cycles/cycles";
 import type { PaymentRow } from "../../services/payments.api";
@@ -9,7 +9,6 @@ import { accountStatus, pensionSummary } from "./paymentView";
 type Props = {
   rows: PaymentRow[];
   onRegister: (row: PaymentRow) => void;
-  onHistory: (row: PaymentRow) => void;
 };
 function EnrollmentCell({ row }: { row: PaymentRow }) {
   const charge = row.obligations.find((c) => c.paymentType === "ENROLLMENT");
@@ -92,32 +91,21 @@ function StudentIdentity({ row }: { row: PaymentRow }) {
 function PaymentActions({
   row,
   onRegister,
-  onHistory,
-}: Pick<Props, "onRegister" | "onHistory"> & { row: PaymentRow }) {
+}: Pick<Props, "onRegister"> & { row: PaymentRow }) {
   return (
     <div className="flex flex-nowrap items-center justify-center gap-2">
-      {Number(row.balance) > 0 && (
-        <button
-          onClick={() => onRegister(row)}
-          className="primary-button shrink-0 whitespace-nowrap !gap-1 !rounded-lg !px-2 !py-2 !text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
-        >
-          <Wallet size={15} className="shrink-0" aria-hidden="true" />
-          {t("payments.register")}
-        </button>
-      )}
       <button
-        onClick={() => onHistory(row)}
-        title={t("payments.history")}
-        aria-label={t("payments.historyFor", { name: row.student.fullName })}
-        className="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-700"
+        onClick={() => onRegister(row)}
+        className="primary-button shrink-0 whitespace-nowrap !gap-1 !rounded-lg !px-2 !py-2 !text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
       >
-        <History size={18} aria-hidden="true" />
+        <Wallet size={15} className="shrink-0" aria-hidden="true" />
+        {t("payments.manage")}
       </button>
     </div>
   );
 }
 
-export function PaymentsTable({ rows, onRegister, onHistory }: Props) {
+export function PaymentsTable({ rows, onRegister }: Props) {
   const columns = [
     "student",
     "group",
@@ -187,11 +175,7 @@ export function PaymentsTable({ rows, onRegister, onHistory }: Props) {
                 />
               </td>
               <td className="px-2 py-4 align-middle">
-                <PaymentActions
-                  row={row}
-                  onRegister={onRegister}
-                  onHistory={onHistory}
-                />
+                <PaymentActions row={row} onRegister={onRegister} />
               </td>
             </tr>
           ))}

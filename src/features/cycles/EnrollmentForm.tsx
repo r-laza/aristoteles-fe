@@ -8,6 +8,7 @@ import {
   type AvailableStudent,
   type EnrollmentFee,
 } from "./cycles";
+import { calculateDiscount } from "./enrollment";
 const amount = (value: number | string) =>
   t("cycles.amount", {
     amount: Number(value).toLocaleString("es-EC", {
@@ -57,20 +58,14 @@ export function EnrollmentForm({
       cancelled = true;
     };
   }, [id]);
-  const calculate = (base: number, rawPercentage: string) => {
-    const baseCents = Math.round(base * 100);
-    const percentage = Number(rawPercentage || "0");
-    const discountCents = Math.round((baseCents * percentage) / 100);
-    return {
-      percentage,
-      discountCents,
-      finalCents: baseCents - discountCents,
-      valid:
-        Number.isFinite(percentage) && percentage >= 0 && percentage <= 100,
-    };
-  };
-  const enrollmentDiscount = calculate(baseFee, enrollmentDiscountPercent);
-  const pensionDiscount = calculate(pensionBase, pensionDiscountPercent);
+  const enrollmentDiscount = calculateDiscount(
+    baseFee,
+    enrollmentDiscountPercent,
+  );
+  const pensionDiscount = calculateDiscount(
+    pensionBase,
+    pensionDiscountPercent,
+  );
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (

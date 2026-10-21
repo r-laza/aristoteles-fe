@@ -1,7 +1,6 @@
 import { CycleForm } from "../features/cycles/CycleForm";
-import { EnrollmentForm } from "../features/cycles/EnrollmentForm";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Plus,
@@ -9,6 +8,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
   Trash2,
 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
@@ -207,6 +207,19 @@ function AddCycleGroupForm({
 
 export function AcademicCycleDetailPage() {
   const { id = "" } = useParams();
+  const location = useLocation();
+  const [createdCycle] = useState(() => {
+    const state = location.state as {
+      cycle?: AcademicCycle;
+      created?: boolean;
+    } | null;
+    return state?.cycle?.id === Number(id) ? state.cycle : null;
+  });
+  const [createdFromNavigation] = useState(() =>
+    Boolean(
+      (location.state as { created?: boolean } | null)?.created && createdCycle,
+    ),
+  );
   const [data, setData] = useState<{
     cycle: AcademicCycle;
     groups: CycleGroup[];
@@ -218,9 +231,7 @@ export function AcademicCycleDetailPage() {
   const studentsSection = useRef<HTMLElement>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [modal, setModal] = useState<
-    "cycle" | "addGroup" | "enrollment" | null
-  >(null);
+  const [modal, setModal] = useState<"cycle" | "addGroup" | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<number | null>(null);
   const [groupFilter, setGroupFilter] = useState("");
   const filteredEnrollments =
@@ -242,7 +253,9 @@ export function AcademicCycleDetailPage() {
     pageStart,
     pageStart + pageSize,
   );
-  const [success, setSuccess] = useState("");
+  const [success, setSuccess] = useState(() =>
+    createdFromNavigation ? t("cycles.success") : "",
+  );
   const [actionError, setActionError] = useState("");
   const [today, setToday] = useState(todayKey);
   useEffect(() => {
@@ -251,7 +264,11 @@ export function AcademicCycleDetailPage() {
   }, []);
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getCycle(id), cycleApi.groups(id), cycleApi.enrollments(id)])
+    const cycleRequest =
+      version === 0 && createdCycle
+        ? Promise.resolve(createdCycle)
+        : getCycle(id);
+    Promise.all([cycleRequest, cycleApi.groups(id), cycleApi.enrollments(id)])
       .then(([cycle, groups, enrollments]) => {
         if (!cancelled) {
           setData({ cycle, groups, enrollments });
@@ -277,7 +294,7 @@ export function AcademicCycleDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, version]);
+  }, [createdCycle, id, version]);
   function refresh(message: string) {
     setModal(null);
     setPage(1);
@@ -319,14 +336,10 @@ export function AcademicCycleDetailPage() {
     "cycleDetail.discountApplied",
     "cycleDetail.total",
     "admin.status",
+    "admin.actions",
   ];
   return (
-    <AppLayout
-      banner={{
-        src: "/images/banner-aristoteles.png",
-        alt: t("dashboard.bannerAlt"),
-      }}
-    >
+    <AppLayout>
       <div className="py-5">
         <Link
           to="/admin/cycles"
@@ -569,17 +582,22 @@ export function AcademicCycleDetailPage() {
                 >
                   {t("cycleDetail.studentsEnrollments")}
                 </h2>
-                <button
-                  disabled={data.groups.length === 0}
-                  className="primary-button"
-                  onClick={() => {
-                    setSuccess("");
-                    setModal("enrollment");
-                  }}
-                >
-                  <Plus size={18} aria-hidden="true" />
-                  {t("cycleDetail.enroll")}
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link
+                    to={`/admin/payments?cycleId=${id}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-200 px-4 py-2.5 text-sm font-semibold text-sky-800 transition hover:bg-sky-50 hover:text-sky-950"
+                  >
+                    <CreditCard size={18} aria-hidden="true" />
+                    {t("cycleDetail.managePayments")}
+                  </Link>
+                  <Link
+                    to={`/admin/cycles/${id}/enrollments`}
+                    className="primary-button"
+                  >
+                    <Plus size={18} aria-hidden="true" />
+                    {t("enrollmentPage.addStudents")}
+                  </Link>
+                </div>
               </div>
               <div className="mb-4 grid items-end gap-4 sm:grid-cols-2">
                 <div>
@@ -679,6 +697,14 @@ export function AcademicCycleDetailPage() {
                                 {value}
                               </td>
                             ))}
+                            <td className="px-2 py-4 text-right">
+                              <Link
+                                to={`/admin/payments/${enrollment.id}/manage?cycleId=${id}&returnTo=cycle`}
+                                className="inline-flex rounded-lg bg-sky-950 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-800"
+                              >
+                                {t("payments.register")}
+                              </Link>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -715,6 +741,12 @@ export function AcademicCycleDetailPage() {
                             </div>
                           ))}
                         </dl>
+                        <Link
+                          to={`/admin/payments/${enrollment.id}/manage?cycleId=${id}&returnTo=cycle`}
+                          className="primary-button mt-4 w-full"
+                        >
+                          {t("payments.register")}
+                        </Link>
                       </li>
                     ))}
                   </ul>
@@ -777,15 +809,6 @@ export function AcademicCycleDetailPage() {
                 assignedGroups={data.groups}
                 onClose={() => setModal(null)}
                 onCreated={() => refresh("cycleDetail.groupAdded")}
-              />
-            )}
-            {modal === "enrollment" && (
-              <EnrollmentForm
-                id={id}
-                fee={data.cycle.fee}
-                groups={data.groups}
-                onClose={() => setModal(null)}
-                onCreated={() => refresh("cycleDetail.enrolled")}
               />
             )}
           </>

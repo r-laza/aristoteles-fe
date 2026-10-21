@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { api, apiForm } from "./api";
 export type PaymentType = "ENROLLMENT" | "PENSION";
 export type PaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "OVERDUE";
 export type Obligation = {
@@ -20,7 +20,15 @@ export type PaymentRow = {
   obligations: Obligation[];
   lastPaymentDate: string | null;
   id: number;
-  student: { fullName: string; dni: string };
+  student: {
+    fullName: string;
+    dni: string;
+    representativeName: string;
+    representativeDocumentType: ReceiptDocumentType | null;
+    representativeDocumentNumber: string | null;
+    relationship: "FATHER" | "MOTHER" | "OTHER";
+    relationshipOther: string | null;
+  };
   group: { id: number; name: string };
   baseAmount: string;
   discountAmount: string;
@@ -33,7 +41,14 @@ export type Balances = {
   rows: PaymentRow[];
   totals: { amountDue: string; amountPaid: string; balance: string };
 };
-export const methods = ["CASH", "TRANSFER", "CARD", "OTHER"] as const;
+export const methods = [
+  "CASH",
+  "TRANSFER",
+  "CARD",
+  "YAPE",
+  "PLIN",
+  "OTHER",
+] as const;
 export type PaymentInput = {
   paymentType: PaymentType;
   period: string | null;
@@ -43,18 +58,41 @@ export type PaymentInput = {
   paymentMethod: string;
   reference: string;
   notes: string;
+  payerName: string;
+  payerDocumentType: ReceiptDocumentType;
+  payerDocumentNumber: string;
+  payerRelationship: ReceiptRelationship | "";
+  payerRelationshipOther: string;
 };
 export type PaymentRegistration = {
   payments: Payment[];
   totalAmount: string;
   obligationCount: number;
+  evidenceUploadFailed?: boolean;
 };
-export type Payment = Omit<PaymentInput, "reference" | "notes"> & {
+export type Payment = Omit<
+  PaymentInput,
+  | "reference"
+  | "notes"
+  | "payerName"
+  | "payerDocumentType"
+  | "payerDocumentNumber"
+  | "payerRelationship"
+  | "payerRelationshipOther"
+> & {
   reference: string | null;
   notes: string | null;
   id: number;
   createdAt: string;
   receiptNumber: string | null;
+  payerName: string | null;
+  payerDocumentType: ReceiptDocumentType | null;
+  payerDocumentNumber: string | null;
+  payerRelationship: ReceiptRelationship | null;
+  payerRelationshipOther: string | null;
+  paymentEvidenceKey: string | null;
+  paymentEvidenceOriginalName: string | null;
+  paymentEvidenceMimeType: string | null;
 };
 export type ReceiptDocumentType = "DNI" | "CE" | "PASSPORT";
 export type ReceiptRelationship = "FATHER" | "MOTHER" | "GUARDIAN" | "OTHER";
@@ -63,6 +101,7 @@ export type ReceiptInput = {
   payerDocumentType: ReceiptDocumentType;
   payerDocumentNumber: string;
   payerRelationship: ReceiptRelationship | "";
+  payerRelationshipOther: string;
 };
 export type PaymentReceipt = {
   paymentId: number;
@@ -73,6 +112,7 @@ export type PaymentReceipt = {
     documentType: ReceiptDocumentType;
     documentNumber: string;
     relationship: ReceiptRelationship | null;
+    relationshipOther: string | null;
   };
   student: { name: string; group: string; cycle: string };
   payment: {
@@ -100,4 +140,11 @@ export const paymentsApi = {
     api<PaymentReceipt>(`/api/admin/payments/${id}/receipt`),
   createReceipt: (id: number, input: ReceiptInput) =>
     api<PaymentReceipt>(`/api/admin/payments/${id}/receipt`, input),
+  uploadEvidence: (id: number, file: File) => {
+    const body = new FormData();
+    body.append("evidence", file);
+    return apiForm<Payment>(`/api/admin/payments/${id}/evidence`, body);
+  },
+  evidenceUrl: (id: number, download = false) =>
+    `/api/admin/payments/${id}/evidence${download ? "?download=1" : ""}`,
 };
