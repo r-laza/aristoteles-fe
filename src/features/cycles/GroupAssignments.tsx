@@ -12,11 +12,13 @@ export function GroupAssignments({
   onChange,
   disabled,
   onReady,
+  branchIds,
 }: {
   value: GroupAssignment[];
   onChange: (value: GroupAssignment[]) => void;
   disabled: boolean;
   onReady: (ready: boolean) => void;
+  branchIds: number[];
 }) {
   const [groups, setGroups] = useState<ReusableGroup[]>([]);
   const [fees, setFees] = useState<Pension[]>([]);
@@ -47,7 +49,7 @@ export function GroupAssignments({
     };
   }, [version, onReady]);
   const available = groups.filter(
-    (group) => !value.some((row) => row.groupId === group.id),
+    (group) => branchIds.includes(group.branchId) && !value.some((row) => row.groupId === group.id),
   );
   return (
     <section className="space-y-4 border-t border-slate-100 pt-4">
@@ -87,7 +89,7 @@ export function GroupAssignments({
                 className="rounded-xl border border-slate-200 p-4"
               >
                 <legend className="px-1 font-semibold text-sky-950">
-                  {groups.find((group) => group.id === row.groupId)?.name}
+                  {groups.find((group) => group.id === row.groupId)?.name} · {groups.find((group) => group.id === row.groupId)?.branch.name}
                 </legend>
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="min-w-0 flex-1 basis-48">
@@ -167,7 +169,7 @@ export function GroupAssignments({
                       <option value="">{t("cycleDetail.selectGroup")}</option>
                       {available.map((group) => (
                         <option key={group.id} value={group.id}>
-                          {group.name}
+                          {group.name} · {group.branch.name}
                         </option>
                       ))}
                     </select>

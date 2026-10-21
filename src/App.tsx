@@ -16,6 +16,7 @@ import { GroupsPage } from "./pages/GroupsPage";
 import { EnrollmentsPensionsPage } from "./pages/EnrollmentsPensionsPage";
 import { GroupDetailPage } from "./pages/GroupDetailPage";
 import { CycleEnrollmentsPage } from "./pages/CycleEnrollmentsPage";
+import { BranchesPage } from "./pages/BranchesPage";
 
 function App() {
   return (
@@ -58,6 +59,7 @@ function App() {
             <Route path="/admin/users" element={<AdminPage />} />
             <Route path="/admin/cycles" element={<AcademicCyclesPage />} />
             <Route path="/admin/groups" element={<GroupsPage />} />
+            <Route path="/admin/branches" element={<BranchesPage />} />
             <Route path="/admin/groups/:id" element={<GroupDetailPage />} />
             <Route
               path="/admin/enrollments-pensions"

@@ -10,6 +10,7 @@ import {
   ClipboardList,
   UsersRound,
   ReceiptText,
+  MapPin,
   ChevronLeft,
   ChevronRight,
   X,
@@ -54,6 +55,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   label: t("navigation.groups"),
                   icon: UsersRound,
                   to: "/admin/groups",
+                },
+                {
+                  label: t("navigation.branches"),
+                  icon: MapPin,
+                  to: "/admin/branches",
                 },
                 {
                   label: t("navigation.enrollmentsPensions"),

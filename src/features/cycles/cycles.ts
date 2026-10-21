@@ -8,6 +8,7 @@ export type AcademicCycle = {
   fee: EnrollmentFee | null;
   students: number;
   groups: number;
+  branches: { branch: Branch }[];
 };
 export type CycleStatus = "active" | "upcoming" | "finished";
 
@@ -44,6 +45,7 @@ type CycleResponse = {
   startDate: string;
   endDate: string;
   _count: { enrollments: number; groups: number };
+  branches: { branch: Branch }[];
 };
 function mapCycle(cycle: CycleResponse): AcademicCycle {
   return {
@@ -55,6 +57,7 @@ function mapCycle(cycle: CycleResponse): AcademicCycle {
     fee: cycle.fee,
     students: cycle._count.enrollments,
     groups: cycle._count.groups,
+    branches: cycle.branches,
   };
 }
 export async function readCycles(): Promise<AcademicCycle[]> {
@@ -68,6 +71,7 @@ export async function saveCycle(
   cycle: {
     feeId: number;
     groups: GroupAssignment[];
+    branchIds: number[];
     name: string;
     startDate: string;
     endDate: string;
@@ -79,6 +83,7 @@ export async function saveCycle(
       id ? `/api/admin/cycles/${id}` : "/api/admin/cycles",
       {
         groups: cycle.groups,
+        branchIds: cycle.branchIds,
         feeId: cycle.feeId,
         name: cycle.name,
         startDate: cycle.startDate,
@@ -88,7 +93,8 @@ export async function saveCycle(
   );
 }
 export type CatalogGroup = ReusableGroup & { _count: { cycles: number } };
-export type ReusableGroup = { id: number; name: string };
+export type Branch = { id: number; name: string; address: string | null; details: string | null; isActive: boolean; _count?: { groups: number; cycles: number } };
+export type ReusableGroup = { id: number; name: string; branchId: number; branch: Branch };
 export type CatalogFee = EnrollmentFee & {
   _count: { cycles: number; cycleGroups: number; enrollments: number };
 };
@@ -129,11 +135,14 @@ export type CycleGroup = {
   id: number;
   name: string;
   _count: { enrollments: number };
+  reusableGroup: ReusableGroup;
 };
 export type CycleEnrollment = {
   id: number;
   student: { id: number; fullName: string; dni: string };
   group: { id: number; name: string };
+  branch: Branch;
+  transfers: EnrollmentTransfer[];
   fee: EnrollmentFee;
   baseAmount: string;
   discountPercent: string | null;
@@ -143,12 +152,15 @@ export type CycleEnrollment = {
   pensionAmount: string | null;
   status: "ACTIVE";
 };
+export type EnrollmentTransfer = { id: number; transferDate: string; reason: string | null; previousBranch: Branch; newBranch: Branch; previousGroup: { reusableGroup: ReusableGroup }; newGroup: { reusableGroup: ReusableGroup } };
 export type AvailableStudent = {
   id: number;
   fullName: string;
   dni: string;
 };
 export const cycleApi = {
+  branches: () => api<Branch[]>("/api/admin/branches"),
+  saveBranch: (input: Pick<Branch, "name" | "address" | "details" | "isActive">, id?: number) => api<Branch>(id ? `/api/admin/branches/${id}` : "/api/admin/branches", input),
   updateDetails: (
     id: number,
     input: { feeId: number; name: string; startDate: string; endDate: string },
@@ -175,9 +187,9 @@ export const cycleApi = {
   deleteGroup: (id: number) =>
     api<{ id: number }>(`/api/admin/groups/${id}/delete`, {}),
   reusableGroups: () => api<CatalogGroup[]>("/api/admin/groups"),
-  saveGroup: (name: string, id?: number) =>
+  saveGroup: (name: string, branchId: number, id?: number) =>
     api<ReusableGroup>(id ? `/api/admin/groups/${id}` : "/api/admin/groups", {
-      name,
+      name, branchId,
     }),
   deleteFee: (id: number) =>
     api<{ id: number }>(`/api/admin/fees/${id}/delete`, {}),
@@ -200,12 +212,14 @@ export const cycleApi = {
     id: string,
     input: {
       studentId: number;
+      branchId: number;
       groupId: number;
       discountPercent: string;
       pensionDiscountPercent: string;
       discountReason: string;
     },
   ) => api<CycleEnrollment>(`/api/admin/cycles/${id}/enrollments`, input),
+  transfer: (enrollmentId: number, input: { branchId: number; groupId: number; transferDate: string; reason: string }) => api<CycleEnrollment>(`/api/admin/cycles/enrollments/${enrollmentId}/transfer`, input),
 };
 export function formatCycleDate(value: string): string {
   const [year, month, day] = value.split("-");

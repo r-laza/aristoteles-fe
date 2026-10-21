@@ -140,10 +140,40 @@ export function AcademicCyclesPage() {
                         }}
                       />
                     </div>
-                    <dl className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-4">
+                    <dl className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-5">
                       {[
                         ["cycles.start", formatCycleDate(cycle.startDate)],
                         ["cycles.end", formatCycleDate(cycle.endDate)],
+                      ].map(([label, value]) => (
+                        <div key={label} className="min-w-0">
+                          <dt className="text-sm text-slate-500">
+                            {t(String(label))}
+                          </dt>
+                          <dd className="mt-1 break-words font-semibold text-slate-800">
+                            {value}
+                          </dd>
+                        </div>
+                      ))}
+                      <div className="min-w-0">
+                        <dt className="text-sm text-slate-500">
+                          {t("cycles.branch")}
+                        </dt>
+                        <dd className="mt-1 flex flex-wrap gap-1.5">
+                          {cycle.branches.length
+                            ? cycle.branches.map(({ branch }) => (
+                                <span
+                                  key={branch.id}
+                                  className="inline-flex max-w-full rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-sky-800"
+                                >
+                                  <span className="truncate">
+                                    {branch.name}
+                                  </span>
+                                </span>
+                              ))
+                            : t("admin.unavailable")}
+                        </dd>
+                      </div>
+                      {[
                         ["cycles.students", cycle.students],
                         ["cycles.groups", cycle.groups],
                       ].map(([label, value]) => (

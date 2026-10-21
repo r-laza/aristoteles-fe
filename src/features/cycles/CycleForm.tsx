@@ -9,6 +9,7 @@ import {
   type AcademicCycle,
   type CycleGroup,
   type GroupAssignment,
+  type Branch,
 } from "./cycles";
 import { GroupAssignments } from "./GroupAssignments";
 export function CycleForm({
@@ -27,6 +28,8 @@ export function CycleForm({
   const dialog = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchIds, setBranchIds] = useState<number[]>(cycle?.branches.map((row) => row.branch.id) ?? []);
   const [startDate, setStartDate] = useState(cycle?.startDate ?? "");
   const [groups, setGroups] = useState<GroupAssignment[]>(
     initialGroups.map((group) => ({
@@ -57,6 +60,7 @@ export function CycleForm({
       cancelled = true;
     };
   }, [feeVersion]);
+  useEffect(() => { void cycleApi.branches().then((rows) => setBranches(rows.filter((row) => row.isActive))).catch(() => setError(t("branches.loadError"))); }, []);
   const [ready, setReady] = useState(detailsOnly);
   useEffect(() => {
     dialog.current?.showModal();
@@ -79,7 +83,7 @@ export function CycleForm({
       !feesReady ||
       !feeId ||
       (!detailsOnly &&
-        (!groups.length ||
+        (!branchIds.length || !groups.length ||
           groups.some((group) => group.pensionId === null) ||
           new Set(groups.map((group) => group.groupId)).size !== groups.length))
     ) {
@@ -104,6 +108,7 @@ export function CycleForm({
                 startDate,
                 endDate,
                 groups,
+                branchIds,
                 feeId: Number(feeId),
               },
               cycle?.id,
@@ -235,12 +240,16 @@ export function CycleForm({
             )}
           </div>
           {!detailsOnly && (
-            <GroupAssignments
+            <><div>
+              <span className="field-label">{t("branches.cycleAvailability")}</span>
+              <div className="grid gap-2 sm:grid-cols-2">{branches.map((branch) => <label key={branch.id} className="flex items-center gap-2 rounded-xl border p-3"><input type="checkbox" checked={branchIds.includes(branch.id)} onChange={(event) => { setBranchIds((current) => event.target.checked ? [...current, branch.id] : current.filter((id) => id !== branch.id)); if (!event.target.checked) setGroups((current) => current.filter((row) => { const item = initialGroups.find((group) => group.reusableGroupId === row.groupId)?.reusableGroup; return !item || item.branchId !== branch.id; })); }} />{branch.name}</label>)}</div>
+            </div><GroupAssignments
               value={groups}
+              branchIds={branchIds}
               onChange={setGroups}
               disabled={busy}
               onReady={setReady}
-            />
+            /></>
           )}
           {error && (
             <p role="alert" className="text-sm text-red-700">

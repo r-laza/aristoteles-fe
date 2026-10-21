@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { t } from "../../lib/i18n";
 import { ApiError } from "../../services/api";
 import { CycleModal as Modal } from "./CycleModal";
@@ -7,6 +7,7 @@ import {
   todayKey,
   type ReusableGroup,
   type EnrollmentFee,
+  type Branch,
 } from "./cycles";
 
 export function GroupForm({
@@ -20,14 +21,18 @@ export function GroupForm({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [branches, setBranches] = useState<Branch[]>([]);
+  useEffect(() => { void cycleApi.branches().then((rows) => setBranches(rows.filter((row) => row.isActive))).catch(() => setError(t("branches.loadError"))); }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const name = String(new FormData(event.currentTarget).get("name")).trim();
-    if (!name || busy) return;
+    const data = new FormData(event.currentTarget);
+    const name = String(data.get("name")).trim();
+    const branchId = Number(data.get("branchId"));
+    if (!name || !branchId || busy) return;
     setBusy(true);
     setError("");
     try {
-      onCreated(await cycleApi.saveGroup(name, group?.id));
+      onCreated(await cycleApi.saveGroup(name, branchId, group?.id));
     } catch (error) {
       setError(
         t(
@@ -60,6 +65,11 @@ export function GroupForm({
           disabled={busy}
           className="field"
         />
+        <label htmlFor="group-branch" className="field-label">{t("branches.branch")}</label>
+        <select id="group-branch" name="branchId" required defaultValue={group?.branchId ?? ""} disabled={busy} className="field">
+          <option value="" disabled>{t("branches.select")}</option>
+          {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+        </select>
         {error && (
           <p role="alert" className="text-red-700">
             {error}

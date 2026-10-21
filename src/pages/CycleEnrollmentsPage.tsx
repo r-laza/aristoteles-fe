@@ -69,6 +69,7 @@ function EnrollmentConfirmation({
     try {
       const enrollment = await cycleApi.enroll(String(cycle.id), {
         studentId: student.id,
+        branchId: group.reusableGroup.branchId,
         groupId: group.id,
         discountPercent: enrollmentPercent || "0",
         pensionDiscountPercent: pensionPercent || "0",
@@ -213,6 +214,12 @@ function EnrollmentConfirmation({
   );
 }
 
+function TransferModal({ enrollment, cycle, groups, onClose, onSaved }: { enrollment: CycleEnrollment; cycle: AcademicCycle; groups: CycleGroup[]; onClose: () => void; onSaved: () => void }) {
+  const [branchId, setBranchId] = useState(""), [groupId, setGroupId] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setBusy(true); setError(""); const data = new FormData(event.currentTarget); try { await cycleApi.transfer(enrollment.id, { branchId: Number(branchId), groupId: Number(groupId), transferDate: String(data.get("transferDate")), reason: String(data.get("reason")).trim() }); onSaved(); } catch { setError(t("branches.transferError")); } finally { setBusy(false); } }
+  return <CycleModal title={t("branches.change")} busy={busy} onClose={onClose}><form onSubmit={(event) => void submit(event)} className="space-y-4"><p className="text-sm text-slate-600">{t("branches.currentLocation", { branch: enrollment.branch.name, group: enrollment.group.name })}</p><div><label className="field-label">{t("branches.newBranch")}</label><select required className="field" value={branchId} onChange={(event) => { setBranchId(event.target.value); setGroupId(""); }}><option value="">{t("branches.select")}</option>{cycle.branches.map(({branch}) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></div><div><label className="field-label">{t("branches.newGroup")}</label><select required className="field" value={groupId} onChange={(event) => setGroupId(event.target.value)}><option value="">{t("branches.selectGroup")}</option>{groups.filter((group) => group.reusableGroup.branchId === Number(branchId)).map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></div><div><label className="field-label">{t("branches.transferDate")}</label><input name="transferDate" type="date" required defaultValue={new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil" }).format(new Date())} className="field" /></div><div><label className="field-label">{t("branches.reason")}</label><input name="reason" maxLength={500} className="field" /></div>{error && <p role="alert" className="text-red-700">{error}</p>}<div className="flex justify-end gap-3"><button type="button" onClick={onClose} className="rounded-xl border px-4 py-2">{t("admin.cancel")}</button><button className="primary-button">{t("branches.confirmChange")}</button></div></form></CycleModal>;
+}
+
 export function CycleEnrollmentsPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -221,6 +228,7 @@ export function CycleEnrollmentsPage() {
   const [students, setStudents] = useState<AvailableStudent[]>([]);
   const [enrollments, setEnrollments] = useState<CycleEnrollment[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [selectedBranchId, setSelectedBranchId] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -233,6 +241,7 @@ export function CycleEnrollmentsPage() {
     student: AvailableStudent;
     group: CycleGroup;
   } | null>(null);
+  const [transferring, setTransferring] = useState<CycleEnrollment | null>(null);
   const selectedGroup = groups.find(
     (group) => group.id === Number(selectedGroupId),
   );
@@ -390,6 +399,11 @@ export function CycleEnrollmentsPage() {
               </dl>
             </section>
             <section className="mb-6 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+              <label htmlFor="enrollment-branch" className="field-label">{t("branches.branch")}</label>
+              <select id="enrollment-branch" className="field mb-4 max-w-md" value={selectedBranchId} onChange={(event) => { setSelectedBranchId(event.target.value); setSelectedGroupId(""); }}>
+                <option value="">{t("branches.select")}</option>
+                {cycle.branches.map(({ branch }) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+              </select>
               <label htmlFor="enrollment-group" className="field-label">
                 {t("enrollmentPage.group")}
               </label>
@@ -400,7 +414,7 @@ export function CycleEnrollmentsPage() {
                 onChange={(event) => setSelectedGroupId(event.target.value)}
               >
                 <option value="">{t("enrollmentPage.selectGroup")}</option>
-                {groups.map((group) => (
+                {groups.filter((group) => group.reusableGroup.branchId === Number(selectedBranchId)).map((group) => (
                   <option key={group.id} value={group.id}>
                     {group.name}
                   </option>
@@ -512,6 +526,7 @@ export function CycleEnrollmentsPage() {
                 </div>
               )}
             </section>
+            <section className="mt-6 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"><h2 className="text-xl font-semibold text-sky-950">{t("branches.currentEnrollments")}</h2><div className="mt-4 space-y-3">{enrollments.map((enrollment) => <div key={enrollment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"><div><p className="font-semibold">{enrollment.student.fullName}</p><p className="text-sm text-slate-500">{enrollment.branch.name} · {enrollment.group.name}</p>{enrollment.transfers.length > 0 && <p className="mt-1 text-xs text-slate-500">{t("branches.transferCount", { count: enrollment.transfers.length })}</p>}</div><button className="rounded-xl border px-4 py-2 text-sm font-medium text-sky-700" onClick={() => setTransferring(enrollment)}>{t("branches.change")}</button></div>)}</div></section>
           </>
         ) : null}
         {creatingStudent && (
@@ -598,6 +613,7 @@ export function CycleEnrollmentsPage() {
             </div>
           </CycleModal>
         )}
+        {transferring && cycle && <TransferModal enrollment={transferring} cycle={cycle} groups={groups} onClose={() => setTransferring(null)} onSaved={() => { setTransferring(null); setSuccess(t("branches.transferred")); void cycleApi.enrollments(id).then(setEnrollments); }} />}
       </div>
     </AppLayout>
   );
