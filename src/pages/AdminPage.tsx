@@ -13,6 +13,7 @@ import {
   UserPlus,
   Users,
   X,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
@@ -647,11 +648,15 @@ function StudentActions({
   onDetails,
   onEdit,
   onAccess,
+  onNotification,
+  notificationEnabled,
 }: {
   person: Person;
   onDetails: (p: Person) => void;
   onEdit: (p: Person) => void;
   onAccess: (p: Person) => void;
+  onNotification: (p: Person) => void;
+  notificationEnabled: boolean;
 }) {
   const accessLabel = t(
     person.username ? "admin.manageAccess" : "admin.createPlatformAccess",
@@ -663,6 +668,13 @@ function StudentActions({
         icon={Eye}
         onClick={() => onDetails(person)}
       />
+      {notificationEnabled && (
+        <ActionButton
+          label={t("notifications.send")}
+          icon={Bell}
+          onClick={() => onNotification(person)}
+        />
+      )}
       <ActionButton
         label={t("admin.editStudent")}
         icon={Pencil}
@@ -682,11 +694,15 @@ function StudentTable({
   onDetails,
   onEdit,
   onAccess,
+  onNotification,
+  notificationEnabled,
 }: {
   people: Person[];
   onDetails: (p: Person) => void;
   onEdit: (p: Person) => void;
   onAccess: (p: Person) => void;
+  onNotification: (p: Person) => void;
+  notificationEnabled: boolean;
 }) {
   return (
     <>
@@ -756,6 +772,8 @@ function StudentTable({
                     onDetails={onDetails}
                     onEdit={onEdit}
                     onAccess={onAccess}
+                    onNotification={onNotification}
+                    notificationEnabled={notificationEnabled}
                   />
                 </td>
               </tr>
@@ -792,6 +810,8 @@ function StudentTable({
                 onDetails={onDetails}
                 onEdit={onEdit}
                 onAccess={onAccess}
+                onNotification={onNotification}
+                notificationEnabled={notificationEnabled}
               />
             </div>
           </article>
@@ -897,16 +917,38 @@ function StaffTable({
   );
 }
 
+function NotificationConfirmation({ student, onClose, onSent }: { student: Person; onClose: () => void; onSent: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const validPhone = Boolean(student.primaryPhone?.trim());
+  async function send() {
+    if (!validPhone || busy) return;
+    setBusy(true); setError("");
+    try { await peopleApi.sendNotification(student.id); onSent(); }
+    catch { setError(t("notifications.error")); }
+    finally { setBusy(false); }
+  }
+  return <Modal title={t("notifications.confirmTitle")} onClose={onClose} busy={busy}>
+    <dl className="grid gap-3 rounded-xl bg-slate-50 p-4 text-sm sm:grid-cols-2">
+      {[["notifications.student", student.fullName], ["notifications.representative", student.representativeName ?? t("admin.unavailable")], ["notifications.phone", student.primaryPhone ?? t("admin.unavailable")], ["notifications.type", t("notifications.pensionReminder")]].map(([label, value]) => <div key={label}><dt className="text-slate-500">{t(label)}</dt><dd className="font-semibold text-sky-950">{value}</dd></div>)}
+    </dl>
+    {!validPhone && <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{t("notifications.invalidPhone")}</p>}
+    {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
+    <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={busy} onClick={onClose} className="rounded-xl border px-4 py-2">{t("admin.cancel")}</button><button type="button" disabled={busy || !validPhone} onClick={() => void send()} className="primary-button">{t(busy ? "notifications.sending" : "notifications.confirmSend")}</button></div>
+  </Modal>;
+}
+
 export function AdminPage() {
   const [people, setPeople] = useState<Person[]>([]);
   const [tab, setTab] = useState<TabRole>("STUDENT");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [modal, setModal] = useState<
-    "create" | "edit" | "details" | "access" | null
+    "create" | "edit" | "details" | "access" | "notification" | null
   >(null);
   const [selected, setSelected] = useState<Person>();
   const [success, setSuccess] = useState("");
+  const [notificationEnabled, setNotificationEnabled] = useState(false);
   async function load() {
     try {
       setPeople(await peopleApi.list());
@@ -918,6 +960,7 @@ export function AdminPage() {
   }
   useEffect(() => {
     void load();
+    void peopleApi.notificationCapabilities().then((value) => setNotificationEnabled(value.manualEnabled)).catch(() => setNotificationEnabled(false));
   }, []);
   function saved() {
     setModal(null);
@@ -1034,6 +1077,12 @@ export function AdminPage() {
                     setSelected(p);
                     setModal("access");
                   }}
+                  notificationEnabled={notificationEnabled}
+                  onNotification={(p) => {
+                    setSelected(p);
+                    setSuccess("");
+                    setModal("notification");
+                  }}
                 />
               ) : (
                 <StaffTable
@@ -1114,6 +1163,17 @@ export function AdminPage() {
               onSaved={saved}
             />
           </Modal>
+        )}
+        {modal === "notification" && selected && (
+          <NotificationConfirmation
+            student={selected}
+            onClose={() => setModal(null)}
+            onSent={() => {
+              setModal(null);
+              setSelected(undefined);
+              setSuccess(t("notifications.success"));
+            }}
+          />
         )}
       </div>
     </AppLayout>

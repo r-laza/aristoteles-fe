@@ -61,4 +61,11 @@ export const peopleApi = {
     id: number,
     input: { username: string; password?: string; isActive: boolean },
   ) => api<Person>(`/api/admin/people/students/${id}/access`, input),
+  notificationCapabilities: () =>
+    api<{ manualEnabled: boolean }>("/api/admin/notifications/capabilities"),
+  sendNotification: (id: number) =>
+    api<{ status: string; providerMessageId: string }>(
+      `/api/admin/notifications/students/${id}/send`,
+      {},
+    ),
 };

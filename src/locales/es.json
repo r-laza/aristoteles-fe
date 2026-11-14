@@ -52,6 +52,20 @@
     "unavailableForCycle": "Esta sede no está disponible para este ciclo.",
     "noGroups": "No hay grupos disponibles en esta sede."
   },
+  "notifications": {
+    "send": "Enviar notificación",
+    "confirmTitle": "Confirmar envío",
+    "confirmSend": "Enviar notificación",
+    "sending": "Enviando…",
+    "success": "Notificación enviada correctamente.",
+    "error": "No se pudo enviar la notificación.",
+    "student": "Estudiante",
+    "representative": "Representante",
+    "phone": "Teléfono del representante",
+    "type": "Tipo de notificación",
+    "pensionReminder": "Recordatorio de pensión",
+    "invalidPhone": "Este estudiante no tiene un teléfono válido registrado."
+  },
   "dashboard": {
     "hello": "Hola, {{name}}",
     "welcome": "Bienvenido a tu aula virtual.",
