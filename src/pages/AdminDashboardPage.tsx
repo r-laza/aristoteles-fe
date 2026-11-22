@@ -12,6 +12,7 @@ import {
   MonthlyRevenueChart,
 } from "../components/dashboard/AdminDashboardCharts";
 import { money } from "../features/payments/formatting";
+import { loadAdminDashboardData } from "../features/dashboard/adminDashboardLoad";
 import {
   orderCycles,
   readCycles,
@@ -45,16 +46,23 @@ export function AdminDashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([readCycles(), fetchAdminDashboard()])
-      .then(([cycleList, value]) => {
-        if (!cancelled) {
-          setCycles(orderCycles(cycleList, todayKey()));
-          setDashboard(value);
-          setSelectedCycleId(value?.activeCycle.id ?? null);
-          setActiveCycleId(value?.activeCycle.id ?? null);
-          setError(false);
-        }
-      })
+    loadAdminDashboardData(readCycles, fetchAdminDashboard)
+      .then(
+        ({
+          cycles: cycleList,
+          dashboard: value,
+          cyclesFailed,
+          dashboardFailed,
+        }) => {
+          if (!cancelled) {
+            if (cycleList) setCycles(orderCycles(cycleList, todayKey()));
+            setDashboard(value);
+            setSelectedCycleId(value?.activeCycle.id ?? null);
+            setActiveCycleId(value?.activeCycle.id ?? null);
+            setError(cyclesFailed || dashboardFailed);
+          }
+        },
+      )
       .catch(() => {
         if (!cancelled) setError(true);
       })

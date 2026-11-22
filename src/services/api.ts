@@ -25,9 +25,9 @@ export async function api<T>(path: string, body?: unknown): Promise<T> {
       window.dispatchEvent(new Event("auth-expired"));
     throw new ApiError(response.status);
   }
-  return response.status === 204
-    ? (undefined as T)
-    : (response.json() as Promise<T>);
+  if (response.status === 204) return undefined as T;
+  const text = await response.text();
+  return (text ? JSON.parse(text) : null) as T;
 }
 
 export async function apiForm<T>(path: string, body: FormData): Promise<T> {
