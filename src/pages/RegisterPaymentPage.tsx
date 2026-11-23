@@ -267,7 +267,7 @@ export function RegisterPaymentPage() {
                 {t("payments.evidenceUploadFailed")}
               </p>
             )}
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 disabled={downloading}
@@ -277,7 +277,7 @@ export function RegisterPaymentPage() {
                     replace: true,
                   })
                 }
-                className="rounded-xl border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                className="min-h-11 w-full rounded-xl border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
               >
                 {t("admin.close")}
               </button>
@@ -297,7 +297,7 @@ export function RegisterPaymentPage() {
                     setDownloading(false);
                   }
                 }}
-                className="rounded-xl border border-sky-200 px-4 py-2 font-semibold text-sky-800 hover:bg-sky-50"
+                className="min-h-11 w-full rounded-xl border border-sky-200 px-4 py-2 font-semibold text-sky-800 hover:bg-sky-50 sm:w-auto"
               >
                 {t("receipts.view")}
               </button>
@@ -317,7 +317,7 @@ export function RegisterPaymentPage() {
                     setDownloading(false);
                   }
                 }}
-                className="primary-button"
+                className="primary-button min-h-11 w-full sm:w-auto"
               >
                 {t("receipts.download")}
               </button>

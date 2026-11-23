@@ -25,7 +25,7 @@ export function PaymentDialog({
         event.preventDefault();
         if (!busy) onClose();
       }}
-      className="w-[calc(100%-2rem)] max-w-2xl rounded-2xl p-6 text-slate-800 shadow-xl backdrop:bg-slate-950/50"
+      className="m-auto max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-2xl overflow-x-hidden overflow-y-auto rounded-2xl p-4 text-slate-800 shadow-xl backdrop:bg-slate-950/50 sm:p-6"
     >
       <div className="mb-6 flex items-center justify-between gap-4">
         <h2 id={titleId} className="text-xl font-bold text-sky-950">

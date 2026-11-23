@@ -27,6 +27,25 @@ test("204 and HTTP error behavior is preserved", async () => {
   });
 });
 
+test("API errors preserve safe structured validation metadata", async () => {
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        code: "VALIDATION_ERROR",
+        field: "dni",
+        reason: "required",
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  await assert.rejects(api("/api/admin/people", {}), (error) => {
+    assert.ok(error instanceof ApiError);
+    assert.equal(error.code, "VALIDATION_ERROR");
+    assert.equal(error.field, "dni");
+    assert.equal(error.reason, "required");
+    return true;
+  });
+});
+
 test("cycles load when there is no active-cycle dashboard", async () => {
   const upcomingCycle = {
     id: 1,

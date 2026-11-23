@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   emptyFilters,
   filterPaymentRows,
@@ -39,6 +40,13 @@ const row = {
   group: { id: 2 },
   obligations: [enrollment, january, february],
 };
+
+test("money uses the Peruvian sol symbol", async () => {
+  const locale = JSON.parse(
+    await readFile(new URL("../src/locales/es.json", import.meta.url), "utf8"),
+  );
+  assert.equal(locale.cycles.amount, "S/{{amount}}");
+});
 
 test("settled enrollment does not hide outstanding pensions", () => {
   assert.equal(obligationStatus(row.obligations), "OVERDUE");

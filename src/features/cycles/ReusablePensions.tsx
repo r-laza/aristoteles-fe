@@ -241,56 +241,93 @@ export function ReusablePensions() {
           )}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                {[
-                  "admin.name",
-                  "pensionCatalog.monthlyAmount",
-                  "pensionCatalog.dueDay",
-                  "feeCatalog.usedIn",
-                  "admin.status",
-                  "pensionCatalog.actions",
-                ].map((key, index) => (
-                  <th
-                    key={key}
-                    scope="col"
-                    className={`px-5 py-3 font-medium ${index === 5 ? "text-right" : ""}`}
-                  >
-                    {t(key)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map((pension) => (
-                <tr
-                  key={pension.id}
-                  className="transition hover:bg-slate-50/50"
-                >
-                  <th
-                    scope="row"
-                    className="max-w-xs break-words px-5 py-4 font-semibold text-sky-950"
-                  >
-                    {pension.name}
-                  </th>
-                  <td className="whitespace-nowrap px-5 py-4 font-medium tabular-nums text-slate-800">
-                    {amount(pension)}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-500">
-                    {pension.dueDay}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-500">
-                    {usage(pension)}
-                  </td>
-                  <td className="px-5 py-4">{status(pension)}</td>
-                  <td className="px-5 py-4">{actions(pension)}</td>
+        <>
+          <ul className="grid gap-3 md:hidden">
+            {filtered.map((pension) => (
+              <li
+                key={pension.id}
+                className="min-w-0 rounded-xl border border-slate-100 p-4"
+              >
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="break-words font-semibold text-sky-950">
+                      {pension.name}
+                    </h3>
+                    <p className="mt-1 font-medium tabular-nums">
+                      {amount(pension)}
+                    </p>
+                  </div>
+                  {status(pension)}
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <dt className="text-slate-500">
+                      {t("pensionCatalog.dueDay")}
+                    </dt>
+                    <dd>{pension.dueDay}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">{t("feeCatalog.usedIn")}</dt>
+                    <dd>{usage(pension)}</dd>
+                  </div>
+                </dl>
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  {actions(pension)}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto rounded-xl border border-slate-100 md:block">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  {[
+                    "admin.name",
+                    "pensionCatalog.monthlyAmount",
+                    "pensionCatalog.dueDay",
+                    "feeCatalog.usedIn",
+                    "admin.status",
+                    "pensionCatalog.actions",
+                  ].map((key, index) => (
+                    <th
+                      key={key}
+                      scope="col"
+                      className={`px-5 py-3 font-medium ${index === 5 ? "text-right" : ""}`}
+                    >
+                      {t(key)}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map((pension) => (
+                  <tr
+                    key={pension.id}
+                    className="transition hover:bg-slate-50/50"
+                  >
+                    <th
+                      scope="row"
+                      className="max-w-xs break-words px-5 py-4 font-semibold text-sky-950"
+                    >
+                      {pension.name}
+                    </th>
+                    <td className="whitespace-nowrap px-5 py-4 font-medium tabular-nums text-slate-800">
+                      {amount(pension)}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-500">
+                      {pension.dueDay}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-500">
+                      {usage(pension)}
+                    </td>
+                    <td className="px-5 py-4">{status(pension)}</td>
+                    <td className="px-5 py-4">{actions(pension)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
       {editing !== undefined && (
         <PensionForm

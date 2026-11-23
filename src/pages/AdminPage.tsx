@@ -22,6 +22,11 @@ import type { Person } from "../auth/types";
 import { peopleApi, type CreatePersonInput } from "../services/auth.api";
 import { ApiError } from "../services/api";
 import { t } from "../lib/i18n";
+import {
+  validateStaffForm,
+  validateStudentForm,
+  type PersonFieldErrors,
+} from "../features/admin/personValidation";
 
 type TabRole = "STUDENT" | "TEACHER" | "ADMIN";
 type StudentInput = Extract<CreatePersonInput, { role: "STUDENT" }>;
@@ -47,7 +52,7 @@ export function Modal({
         if (!busy) onClose();
       }}
       aria-labelledby="modal-title"
-      className="w-[calc(100%-2rem)] max-w-2xl rounded-2xl p-6 shadow-xl backdrop:bg-slate-950/50"
+      className="m-auto max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-2xl overflow-x-hidden overflow-y-auto rounded-2xl p-4 shadow-xl backdrop:bg-slate-950/50 sm:p-6"
     >
       <div className="mb-6 flex items-center justify-between gap-3">
         <h2 id="modal-title" className="text-xl font-bold text-sky-950">
@@ -74,15 +79,18 @@ function Field({
   type = "text",
   required = true,
   defaultValue,
+  error,
 }: {
   label: string;
   name: string;
   type?: string;
   required?: boolean;
   defaultValue?: string;
+  error?: string;
 }) {
+  const errorId = `${name}-error`;
   return (
-    <div>
+    <div className="min-w-0">
       <label htmlFor={name} className="field-label">
         {label}
       </label>
@@ -93,10 +101,33 @@ function Field({
         required={required}
         defaultValue={defaultValue}
         maxLength={type === "date" ? undefined : 200}
-        className="field"
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? errorId : undefined}
+        className={`field ${error ? "border-red-500 focus:border-red-500 focus:ring-red-100" : ""}`}
       />
+      <FieldError id={errorId} error={error} />
     </div>
   );
+}
+
+function fieldErrorText(reason?: string) {
+  if (!reason) return "";
+  if (reason === "required") return t("admin.validation.required");
+  if (reason === "tooLong") return t("admin.validation.tooLong");
+  if (reason === "documentFormat")
+    return t("admin.validation.documentFormat");
+  if (reason === "duplicateDni") return t("admin.validation.duplicateDni");
+  if (reason === "duplicateUsername")
+    return t("admin.validation.duplicateUsername");
+  return t("admin.validation.format");
+}
+
+function FieldError({ id, error }: { id: string; error?: string }) {
+  return error ? (
+    <p id={id} className="mt-1 text-sm text-red-700">
+      {fieldErrorText(error)}
+    </p>
+  ) : null;
 }
 
 function StatusField({ defaultValue = true }: { defaultValue?: boolean }) {
@@ -169,16 +200,42 @@ export function StudentForm({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<PersonFieldErrors>({});
   const [access, setAccess] = useState(false);
   const [relationship, setRelationship] = useState(
     student?.relationship ?? "FATHER",
   );
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy(true);
     setError("");
     const data = new FormData(event.currentTarget);
     const value = (key: string) => String(data.get(key) ?? "").trim();
+    const values = Object.fromEntries(
+      [
+        "dni",
+        "firstName",
+        "lastName",
+        "birthDate",
+        "gender",
+        "representativeName",
+        "representativeDocumentType",
+        "representativeDocumentNumber",
+        "relationship",
+        "relationshipOther",
+        "primaryPhone",
+        "secondaryPhone",
+        "username",
+        "password",
+      ].map((key) => [key, value(key)]),
+    );
+    const validation = validateStudentForm(values, !student && access);
+    if (Object.keys(validation).length) {
+      setFieldErrors(validation);
+      setError(t("admin.validation.review"));
+      return;
+    }
+    setFieldErrors({});
+    setBusy(true);
     const input: StudentInput = {
       role: "STUDENT",
       dni: value("dni"),
@@ -214,44 +271,72 @@ export function StudentForm({
       } else saved = await peopleApi.create(input);
       onSaved(saved);
     } catch (cause) {
-      setError(
-        t(
-          cause instanceof ApiError && cause.status === 409
-            ? "admin.duplicate"
-            : "admin.error",
-        ),
-      );
+      if (cause instanceof ApiError && cause.field) {
+        const reason =
+          cause.status === 409
+            ? cause.field === "dni"
+              ? "duplicateDni"
+              : "duplicateUsername"
+            : (cause.reason ?? "format");
+        setFieldErrors({ [cause.field]: reason });
+        setError(t("admin.validation.review"));
+      } else {
+        setError(
+          t(
+            cause instanceof ApiError && cause.status === 409
+              ? "admin.duplicate"
+              : "admin.error",
+          ),
+        );
+      }
     } finally {
       setBusy(false);
     }
   }
   return (
-    <form onSubmit={(event) => void submit(event)} className="space-y-4">
+    <form
+      noValidate
+      onSubmit={(event) => void submit(event)}
+      onInput={(event) => {
+        const name = (event.target as HTMLInputElement).name;
+        if (name && fieldErrors[name])
+          setFieldErrors((current) => {
+            const next = { ...current };
+            delete next[name];
+            return next;
+          });
+      }}
+      className="min-w-0 space-y-4"
+    >
       <fieldset disabled={busy} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label={t("admin.dni")}
             name="dni"
             defaultValue={student?.dni}
+            error={fieldErrors.dni}
           />
           <Field
             label={t("admin.birthDate")}
             name="birthDate"
             type="date"
             defaultValue={student?.birthDate?.slice(0, 10)}
+            error={fieldErrors.birthDate}
           />
           <Field
             label={t("admin.firstName")}
             name="firstName"
             defaultValue={student?.firstName}
+            error={fieldErrors.firstName}
           />
           <Field
             label={t("admin.lastName")}
             name="lastName"
             defaultValue={student?.lastName}
+            error={fieldErrors.lastName}
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label htmlFor="gender" className="field-label">
             {t("admin.gender")}
           </label>
@@ -259,7 +344,9 @@ export function StudentForm({
             id="gender"
             name="gender"
             defaultValue={student?.gender ?? "MALE"}
-            className="field"
+            aria-invalid={Boolean(fieldErrors.gender)}
+            aria-describedby={fieldErrors.gender ? "gender-error" : undefined}
+            className={`field ${fieldErrors.gender ? "border-red-500" : ""}`}
           >
             {["MALE", "FEMALE", "OTHER"].map((value) => (
               <option key={value} value={value}>
@@ -267,14 +354,16 @@ export function StudentForm({
               </option>
             ))}
           </select>
+          <FieldError id="gender-error" error={fieldErrors.gender} />
         </div>
         <Field
           label={t("admin.representativeName")}
           name="representativeName"
           defaultValue={student?.representativeName}
+          error={fieldErrors.representativeName}
         />
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+          <div className="min-w-0">
             <label htmlFor="representativeDocumentType" className="field-label">
               {t("admin.representativeDocumentType")}
             </label>
@@ -282,7 +371,13 @@ export function StudentForm({
               id="representativeDocumentType"
               name="representativeDocumentType"
               defaultValue={student?.representativeDocumentType ?? "DNI"}
-              className="field"
+              aria-invalid={Boolean(fieldErrors.representativeDocumentType)}
+              aria-describedby={
+                fieldErrors.representativeDocumentType
+                  ? "representativeDocumentType-error"
+                  : undefined
+              }
+              className={`field ${fieldErrors.representativeDocumentType ? "border-red-500" : ""}`}
             >
               {(["DNI", "CE", "PASSPORT"] as const).map((type) => (
                 <option key={type} value={type}>
@@ -290,14 +385,19 @@ export function StudentForm({
                 </option>
               ))}
             </select>
+            <FieldError
+              id="representativeDocumentType-error"
+              error={fieldErrors.representativeDocumentType}
+            />
           </div>
           <Field
             label={t("admin.representativeDocumentNumber")}
             name="representativeDocumentNumber"
             defaultValue={student?.representativeDocumentNumber}
+            error={fieldErrors.representativeDocumentNumber}
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label htmlFor="relationship" className="field-label">
             {t("admin.relationship")}
           </label>
@@ -310,7 +410,11 @@ export function StudentForm({
                 event.target.value as StudentInput["relationship"],
               )
             }
-            className="field"
+            aria-invalid={Boolean(fieldErrors.relationship)}
+            aria-describedby={
+              fieldErrors.relationship ? "relationship-error" : undefined
+            }
+            className={`field ${fieldErrors.relationship ? "border-red-500" : ""}`}
           >
             {["FATHER", "MOTHER", "OTHER"].map((value) => (
               <option key={value} value={value}>
@@ -318,12 +422,14 @@ export function StudentForm({
               </option>
             ))}
           </select>
+          <FieldError id="relationship-error" error={fieldErrors.relationship} />
         </div>
         {relationship === "OTHER" && (
           <Field
             label={t("admin.relationshipOther")}
             name="relationshipOther"
             defaultValue={student?.relationshipOther ?? undefined}
+            error={fieldErrors.relationshipOther}
           />
         )}
         <div className="grid gap-4 sm:grid-cols-2">
@@ -332,6 +438,7 @@ export function StudentForm({
             name="primaryPhone"
             type="tel"
             defaultValue={student?.primaryPhone}
+            error={fieldErrors.primaryPhone}
           />
           <Field
             label={t("admin.secondaryPhone")}
@@ -339,6 +446,7 @@ export function StudentForm({
             type="tel"
             required={false}
             defaultValue={student?.secondaryPhone ?? undefined}
+            error={fieldErrors.secondaryPhone}
           />
         </div>
         <StatusField defaultValue={student?.isActive} />
@@ -354,13 +462,26 @@ export function StudentForm({
               <span>{t("admin.createAccessForStudent")}</span>
             </label>
             {access && (
-              <div className="grid gap-4 rounded-xl border border-slate-200 p-4 sm:grid-cols-2">
-                <Field label={t("auth.username")} name="username" />
-                <div>
+              <div className="grid min-w-0 gap-4 rounded-xl border border-slate-200 p-4 sm:grid-cols-2">
+                <Field
+                  label={t("auth.username")}
+                  name="username"
+                  error={fieldErrors.username}
+                />
+                <div className="min-w-0">
                   <label htmlFor="password" className="field-label">
                     {t("admin.temporaryPassword")}
                   </label>
-                  <PasswordInput id="password" newPassword />
+                  <div
+                    className={
+                      fieldErrors.password
+                        ? "rounded-xl ring-1 ring-red-500"
+                        : ""
+                    }
+                  >
+                    <PasswordInput id="password" newPassword />
+                  </div>
+                  <FieldError id="password-error" error={fieldErrors.password} />
                 </div>
               </div>
             )}
@@ -386,9 +507,9 @@ function StaffForm({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<PersonFieldErrors>({});
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy(true);
     setError("");
     const data = new FormData(event.currentTarget);
     const input = {
@@ -397,6 +518,21 @@ function StaffForm({
       password: String(data.get("password") ?? ""),
       isActive: data.get("isActive") === "true",
     };
+    const validation = validateStaffForm(
+      {
+        fullName: input.fullName,
+        username: input.username,
+        password: input.password,
+      },
+      !person,
+    );
+    if (Object.keys(validation).length) {
+      setFieldErrors(validation);
+      setError(t("admin.validation.review"));
+      return;
+    }
+    setFieldErrors({});
+    setBusy(true);
     try {
       if (person)
         await peopleApi.updateUser(person.id, {
@@ -406,29 +542,38 @@ function StaffForm({
       else await peopleApi.create({ ...input, role });
       onSaved();
     } catch (cause) {
-      setError(
-        t(
-          cause instanceof ApiError && cause.status === 409
-            ? "admin.duplicate"
-            : "admin.error",
-        ),
-      );
+      if (cause instanceof ApiError && cause.field) {
+        setFieldErrors({
+          [cause.field]:
+            cause.status === 409 ? "duplicateUsername" : (cause.reason ?? "format"),
+        });
+        setError(t("admin.validation.review"));
+      } else
+        setError(
+          t(
+            cause instanceof ApiError && cause.status === 409
+              ? "admin.duplicate"
+              : "admin.error",
+          ),
+        );
     } finally {
       setBusy(false);
     }
   }
   return (
-    <form onSubmit={(event) => void submit(event)} className="space-y-4">
+    <form noValidate onSubmit={(event) => void submit(event)} className="space-y-4">
       <fieldset disabled={busy} className="space-y-4">
         <Field
           label={t("admin.fullName")}
           name="fullName"
           defaultValue={person?.fullName}
+          error={fieldErrors.fullName}
         />
         <Field
           label={t("auth.username")}
           name="username"
           defaultValue={person?.username ?? undefined}
+          error={fieldErrors.username}
         />
         <div>
           <label htmlFor="password" className="field-label">
@@ -441,11 +586,15 @@ function StaffForm({
               type="password"
               maxLength={256}
               autoComplete="new-password"
-              className="field"
+              aria-invalid={Boolean(fieldErrors.password)}
+              className={`field ${fieldErrors.password ? "border-red-500" : ""}`}
             />
           ) : (
-            <PasswordInput id="password" newPassword />
+            <div className={fieldErrors.password ? "rounded-xl ring-1 ring-red-500" : ""}>
+              <PasswordInput id="password" newPassword />
+            </div>
           )}
+          <FieldError id="password-error" error={fieldErrors.password} />
         </div>
         <StatusField defaultValue={person?.isActive} />
       </fieldset>

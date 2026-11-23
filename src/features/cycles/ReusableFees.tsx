@@ -236,49 +236,75 @@ export function ReusableFees() {
           {t(fees.length ? "feeCatalog.noResults" : "cycles.noReusableFees")}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                {[
-                  "admin.name",
-                  "cycleDetail.feeAmount",
-                  "feeCatalog.usedIn",
-                  "admin.status",
-                  "feeCatalog.actions",
-                ].map((key, index) => (
-                  <th
-                    key={key}
-                    scope="col"
-                    className={`px-5 py-3 font-medium ${index === 4 ? "text-right" : ""}`}
-                  >
-                    {t(key)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map((fee) => (
-                <tr key={fee.id} className="transition hover:bg-slate-50/50">
-                  <th
-                    scope="row"
-                    className="max-w-xs break-words px-5 py-4 font-semibold text-sky-950"
-                  >
-                    {fee.name}
-                  </th>
-                  <td className="whitespace-nowrap px-5 py-4 font-medium tabular-nums text-slate-800">
-                    {amount(fee)}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-4 text-slate-500">
-                    {usage(fee)}
-                  </td>
-                  <td className="px-5 py-4">{status(fee)}</td>
-                  <td className="px-5 py-4">{actions(fee)}</td>
+        <>
+          <ul className="grid gap-3 md:hidden">
+            {filtered.map((fee) => (
+              <li
+                key={fee.id}
+                className="min-w-0 rounded-xl border border-slate-100 p-4"
+              >
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="break-words font-semibold text-sky-950">
+                      {fee.name}
+                    </h3>
+                    <p className="mt-1 font-medium tabular-nums">
+                      {amount(fee)}
+                    </p>
+                  </div>
+                  {status(fee)}
+                </div>
+                <p className="mt-3 text-sm text-slate-500">{usage(fee)}</p>
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  {actions(fee)}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto rounded-xl border border-slate-100 md:block">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  {[
+                    "admin.name",
+                    "cycleDetail.feeAmount",
+                    "feeCatalog.usedIn",
+                    "admin.status",
+                    "feeCatalog.actions",
+                  ].map((key, index) => (
+                    <th
+                      key={key}
+                      scope="col"
+                      className={`px-5 py-3 font-medium ${index === 4 ? "text-right" : ""}`}
+                    >
+                      {t(key)}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map((fee) => (
+                  <tr key={fee.id} className="transition hover:bg-slate-50/50">
+                    <th
+                      scope="row"
+                      className="max-w-xs break-words px-5 py-4 font-semibold text-sky-950"
+                    >
+                      {fee.name}
+                    </th>
+                    <td className="whitespace-nowrap px-5 py-4 font-medium tabular-nums text-slate-800">
+                      {amount(fee)}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-500">
+                      {usage(fee)}
+                    </td>
+                    <td className="px-5 py-4">{status(fee)}</td>
+                    <td className="px-5 py-4">{actions(fee)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
       {editing !== undefined && (
         <FeeForm

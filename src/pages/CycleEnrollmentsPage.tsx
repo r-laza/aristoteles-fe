@@ -214,10 +214,126 @@ function EnrollmentConfirmation({
   );
 }
 
-function TransferModal({ enrollment, cycle, groups, onClose, onSaved }: { enrollment: CycleEnrollment; cycle: AcademicCycle; groups: CycleGroup[]; onClose: () => void; onSaved: () => void }) {
-  const [branchId, setBranchId] = useState(""), [groupId, setGroupId] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState("");
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setBusy(true); setError(""); const data = new FormData(event.currentTarget); try { await cycleApi.transfer(enrollment.id, { branchId: Number(branchId), groupId: Number(groupId), transferDate: String(data.get("transferDate")), reason: String(data.get("reason")).trim() }); onSaved(); } catch { setError(t("branches.transferError")); } finally { setBusy(false); } }
-  return <CycleModal title={t("branches.change")} busy={busy} onClose={onClose}><form onSubmit={(event) => void submit(event)} className="space-y-4"><p className="text-sm text-slate-600">{t("branches.currentLocation", { branch: enrollment.branch.name, group: enrollment.group.name })}</p><div><label className="field-label">{t("branches.newBranch")}</label><select required className="field" value={branchId} onChange={(event) => { setBranchId(event.target.value); setGroupId(""); }}><option value="">{t("branches.select")}</option>{cycle.branches.map(({branch}) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></div><div><label className="field-label">{t("branches.newGroup")}</label><select required className="field" value={groupId} onChange={(event) => setGroupId(event.target.value)}><option value="">{t("branches.selectGroup")}</option>{groups.filter((group) => group.reusableGroup.branchId === Number(branchId)).map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></div><div><label className="field-label">{t("branches.transferDate")}</label><input name="transferDate" type="date" required defaultValue={new Intl.DateTimeFormat("en-CA", { timeZone: "America/Guayaquil" }).format(new Date())} className="field" /></div><div><label className="field-label">{t("branches.reason")}</label><input name="reason" maxLength={500} className="field" /></div>{error && <p role="alert" className="text-red-700">{error}</p>}<div className="flex justify-end gap-3"><button type="button" onClick={onClose} className="rounded-xl border px-4 py-2">{t("admin.cancel")}</button><button className="primary-button">{t("branches.confirmChange")}</button></div></form></CycleModal>;
+function TransferModal({
+  enrollment,
+  cycle,
+  groups,
+  onClose,
+  onSaved,
+}: {
+  enrollment: CycleEnrollment;
+  cycle: AcademicCycle;
+  groups: CycleGroup[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [branchId, setBranchId] = useState(""),
+    [groupId, setGroupId] = useState(""),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    const data = new FormData(event.currentTarget);
+    try {
+      await cycleApi.transfer(enrollment.id, {
+        branchId: Number(branchId),
+        groupId: Number(groupId),
+        transferDate: String(data.get("transferDate")),
+        reason: String(data.get("reason")).trim(),
+      });
+      onSaved();
+    } catch {
+      setError(t("branches.transferError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <CycleModal title={t("branches.change")} busy={busy} onClose={onClose}>
+      <form onSubmit={(event) => void submit(event)} className="space-y-4">
+        <p className="text-sm text-slate-600">
+          {t("branches.currentLocation", {
+            branch: enrollment.branch.name,
+            group: enrollment.group.name,
+          })}
+        </p>
+        <div>
+          <label className="field-label">{t("branches.newBranch")}</label>
+          <select
+            required
+            className="field"
+            value={branchId}
+            onChange={(event) => {
+              setBranchId(event.target.value);
+              setGroupId("");
+            }}
+          >
+            <option value="">{t("branches.select")}</option>
+            {cycle.branches.map(({ branch }) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="field-label">{t("branches.newGroup")}</label>
+          <select
+            required
+            className="field"
+            value={groupId}
+            onChange={(event) => setGroupId(event.target.value)}
+          >
+            <option value="">{t("branches.selectGroup")}</option>
+            {groups
+              .filter(
+                (group) => group.reusableGroup.branchId === Number(branchId),
+              )
+              .map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+          </select>
+        </div>
+        <div>
+          <label className="field-label">{t("branches.transferDate")}</label>
+          <input
+            name="transferDate"
+            type="date"
+            required
+            defaultValue={new Intl.DateTimeFormat("en-CA", {
+              timeZone: "America/Guayaquil",
+            }).format(new Date())}
+            className="field"
+          />
+        </div>
+        <div>
+          <label className="field-label">{t("branches.reason")}</label>
+          <input name="reason" maxLength={500} className="field" />
+        </div>
+        {error && (
+          <p role="alert" className="text-red-700">
+            {error}
+          </p>
+        )}
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border px-4 py-2"
+          >
+            {t("admin.cancel")}
+          </button>
+          <button className="primary-button">
+            {t("branches.confirmChange")}
+          </button>
+        </div>
+      </form>
+    </CycleModal>
+  );
 }
 
 export function CycleEnrollmentsPage() {
@@ -241,7 +357,9 @@ export function CycleEnrollmentsPage() {
     student: AvailableStudent;
     group: CycleGroup;
   } | null>(null);
-  const [transferring, setTransferring] = useState<CycleEnrollment | null>(null);
+  const [transferring, setTransferring] = useState<CycleEnrollment | null>(
+    null,
+  );
   const selectedGroup = groups.find(
     (group) => group.id === Number(selectedGroupId),
   );
@@ -399,10 +517,24 @@ export function CycleEnrollmentsPage() {
               </dl>
             </section>
             <section className="mb-6 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-              <label htmlFor="enrollment-branch" className="field-label">{t("branches.branch")}</label>
-              <select id="enrollment-branch" className="field mb-4 max-w-md" value={selectedBranchId} onChange={(event) => { setSelectedBranchId(event.target.value); setSelectedGroupId(""); }}>
+              <label htmlFor="enrollment-branch" className="field-label">
+                {t("branches.branch")}
+              </label>
+              <select
+                id="enrollment-branch"
+                className="field mb-4 max-w-md"
+                value={selectedBranchId}
+                onChange={(event) => {
+                  setSelectedBranchId(event.target.value);
+                  setSelectedGroupId("");
+                }}
+              >
                 <option value="">{t("branches.select")}</option>
-                {cycle.branches.map(({ branch }) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                {cycle.branches.map(({ branch }) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
               </select>
               <label htmlFor="enrollment-group" className="field-label">
                 {t("enrollmentPage.group")}
@@ -414,11 +546,16 @@ export function CycleEnrollmentsPage() {
                 onChange={(event) => setSelectedGroupId(event.target.value)}
               >
                 <option value="">{t("enrollmentPage.selectGroup")}</option>
-                {groups.filter((group) => group.reusableGroup.branchId === Number(selectedBranchId)).map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
+                {groups
+                  .filter(
+                    (group) =>
+                      group.reusableGroup.branchId === Number(selectedBranchId),
+                  )
+                  .map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
               </select>
               {!selectedGroup && (
                 <p
@@ -483,50 +620,111 @@ export function CycleEnrollmentsPage() {
                   )}
                 </p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[600px] text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-500">
-                      <tr>
-                        <th className="px-4 py-3">{t("enrollmentPage.dni")}</th>
-                        <th className="px-4 py-3">
-                          {t("enrollmentPage.student")}
-                        </th>
-                        <th className="px-4 py-3">{t("admin.status")}</th>
-                        <th className="px-4 py-3 text-right">
-                          {t("admin.actions")}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredStudents.map((student) => (
-                        <tr key={student.id}>
-                          <td className="px-4 py-4">{student.dni}</td>
-                          <td className="px-4 py-4 font-semibold text-sky-950">
-                            {student.fullName}
-                          </td>
-                          <td className="px-4 py-4">
-                            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                              {t("admin.active")}
-                            </span>
-                          </td>
-                          <td className="px-4 py-4 text-right">
-                            <button
-                              type="button"
-                              disabled={!selectedGroup?.pension || !cycle.fee}
-                              onClick={() => setSelectedStudent(student)}
-                              className="primary-button ml-auto disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100 disabled:transition-none disabled:hover:bg-slate-200"
-                            >
-                              {t("enrollmentPage.enroll")}
-                            </button>
-                          </td>
+                <>
+                  <ul className="grid gap-3 md:hidden">
+                    {filteredStudents.map((student) => (
+                      <li
+                        key={student.id}
+                        className="min-w-0 rounded-xl border border-slate-100 p-4"
+                      >
+                        <p className="break-words font-semibold text-sky-950">
+                          {student.fullName}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {student.dni}
+                        </p>
+                        <button
+                          type="button"
+                          disabled={!selectedGroup?.pension || !cycle.fee}
+                          onClick={() => setSelectedStudent(student)}
+                          className="primary-button mt-4 min-h-12 w-full disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100"
+                        >
+                          {t("enrollmentPage.enroll")}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full min-w-[600px] text-left text-sm">
+                      <thead className="bg-slate-50 text-slate-500">
+                        <tr>
+                          <th className="px-4 py-3">
+                            {t("enrollmentPage.dni")}
+                          </th>
+                          <th className="px-4 py-3">
+                            {t("enrollmentPage.student")}
+                          </th>
+                          <th className="px-4 py-3">{t("admin.status")}</th>
+                          <th className="px-4 py-3 text-right">
+                            {t("admin.actions")}
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredStudents.map((student) => (
+                          <tr key={student.id}>
+                            <td className="px-4 py-4">{student.dni}</td>
+                            <td className="px-4 py-4 font-semibold text-sky-950">
+                              {student.fullName}
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                {t("admin.active")}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              <button
+                                type="button"
+                                disabled={!selectedGroup?.pension || !cycle.fee}
+                                onClick={() => setSelectedStudent(student)}
+                                className="primary-button ml-auto disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100 disabled:transition-none disabled:hover:bg-slate-200"
+                              >
+                                {t("enrollmentPage.enroll")}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </section>
-            <section className="mt-6 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"><h2 className="text-xl font-semibold text-sky-950">{t("branches.currentEnrollments")}</h2><div className="mt-4 space-y-3">{enrollments.map((enrollment) => <div key={enrollment.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"><div><p className="font-semibold">{enrollment.student.fullName}</p><p className="text-sm text-slate-500">{enrollment.branch.name} · {enrollment.group.name}</p>{enrollment.transfers.length > 0 && <p className="mt-1 text-xs text-slate-500">{t("branches.transferCount", { count: enrollment.transfers.length })}</p>}</div><button className="rounded-xl border px-4 py-2 text-sm font-medium text-sky-700" onClick={() => setTransferring(enrollment)}>{t("branches.change")}</button></div>)}</div></section>
+            <section className="mt-6 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+              <h2 className="text-xl font-semibold text-sky-950">
+                {t("branches.currentEnrollments")}
+              </h2>
+              <div className="mt-4 space-y-3">
+                {enrollments.map((enrollment) => (
+                  <div
+                    key={enrollment.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
+                  >
+                    <div>
+                      <p className="font-semibold">
+                        {enrollment.student.fullName}
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {enrollment.branch.name} · {enrollment.group.name}
+                      </p>
+                      {enrollment.transfers.length > 0 && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {t("branches.transferCount", {
+                            count: enrollment.transfers.length,
+                          })}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      className="rounded-xl border px-4 py-2 text-sm font-medium text-sky-700"
+                      onClick={() => setTransferring(enrollment)}
+                    >
+                      {t("branches.change")}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
           </>
         ) : null}
         {creatingStudent && (
@@ -613,7 +811,19 @@ export function CycleEnrollmentsPage() {
             </div>
           </CycleModal>
         )}
-        {transferring && cycle && <TransferModal enrollment={transferring} cycle={cycle} groups={groups} onClose={() => setTransferring(null)} onSaved={() => { setTransferring(null); setSuccess(t("branches.transferred")); void cycleApi.enrollments(id).then(setEnrollments); }} />}
+        {transferring && cycle && (
+          <TransferModal
+            enrollment={transferring}
+            cycle={cycle}
+            groups={groups}
+            onClose={() => setTransferring(null)}
+            onSaved={() => {
+              setTransferring(null);
+              setSuccess(t("branches.transferred"));
+              void cycleApi.enrollments(id).then(setEnrollments);
+            }}
+          />
+        )}
       </div>
     </AppLayout>
   );
