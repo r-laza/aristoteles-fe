@@ -44,18 +44,18 @@ export type Balances = {
 export const methods = [
   "CASH",
   "TRANSFER",
-  "CARD",
   "YAPE",
   "PLIN",
-  "OTHER",
 ] as const;
+export type NewPaymentMethod = (typeof methods)[number];
+export type PaymentMethod = NewPaymentMethod | "CARD" | "OTHER";
 export type PaymentInput = {
   paymentType: PaymentType;
   period: string | null;
   periods?: string[];
   amount: string;
   paymentDate: string;
-  paymentMethod: string;
+  paymentMethod: NewPaymentMethod;
   reference: string;
   notes: string;
   payerName: string;
@@ -79,6 +79,7 @@ export type Payment = Omit<
   | "payerDocumentNumber"
   | "payerRelationship"
   | "payerRelationshipOther"
+  | "paymentMethod"
 > & {
   reference: string | null;
   notes: string | null;
@@ -90,9 +91,11 @@ export type Payment = Omit<
   payerDocumentNumber: string | null;
   payerRelationship: ReceiptRelationship | null;
   payerRelationshipOther: string | null;
+  paymentMethod: PaymentMethod;
   paymentEvidenceKey: string | null;
   paymentEvidenceOriginalName: string | null;
   paymentEvidenceMimeType: string | null;
+  paymentEvidenceStorage: "local" | "s3" | null;
 };
 export type ReceiptDocumentType = "DNI" | "CE" | "PASSPORT";
 export type ReceiptRelationship = "FATHER" | "MOTHER" | "GUARDIAN" | "OTHER";
@@ -117,7 +120,7 @@ export type PaymentReceipt = {
   student: { name: string; group: string; cycle: string };
   payment: {
     date: string;
-    method: (typeof methods)[number];
+    method: PaymentMethod;
     reference: string | null;
     amount: string;
   };
