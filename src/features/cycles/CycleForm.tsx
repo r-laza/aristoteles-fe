@@ -10,6 +10,7 @@ import {
   type CycleGroup,
   type GroupAssignment,
   type Branch,
+  type CycleCategory,
 } from "./cycles";
 import { GroupAssignments } from "./GroupAssignments";
 export function CycleForm({
@@ -41,6 +42,7 @@ export function CycleForm({
   );
   const [fees, setFees] = useState<EnrollmentFee[]>([]);
   const [feeId, setFeeId] = useState<number | "">(cycle?.feeId ?? "");
+  const [category, setCategory] = useState<CycleCategory>(cycle?.category ?? "SCHOOL");
   const [feesReady, setFeesReady] = useState(false);
   const [feeLoadError, setFeeLoadError] = useState(false);
   const [feeVersion, setFeeVersion] = useState(0);
@@ -87,8 +89,7 @@ export function CycleForm({
     }
     if (
       !ready ||
-      !feesReady ||
-      !feeId ||
+      (category === "SCHOOL" && (!feesReady || !feeId)) ||
       (!detailsOnly &&
         (!branchIds.length ||
           !groups.length ||
@@ -108,7 +109,7 @@ export function CycleForm({
               name,
               startDate,
               endDate,
-              feeId: Number(feeId),
+              feeId: category === "SCHOOL" ? Number(feeId) : null,
             })
           : await saveCycle(
               {
@@ -117,7 +118,8 @@ export function CycleForm({
                 endDate,
                 groups,
                 branchIds,
-                feeId: Number(feeId),
+                category,
+                feeId: category === "SCHOOL" ? Number(feeId) : null,
               },
               cycle?.id,
             ),
@@ -160,6 +162,20 @@ export function CycleForm({
       </div>
       <form onSubmit={submit} className="space-y-4">
         <fieldset disabled={busy} className="space-y-4">
+          <div>
+            <label htmlFor="cycle-category" className="field-label">{t("cycles.category")}</label>
+            <select
+              id="cycle-category"
+              className="field"
+              required
+              disabled={Boolean(cycle)}
+              value={category}
+              onChange={(event) => setCategory(event.target.value as CycleCategory)}
+            >
+              <option value="SCHOOL">{t("cycles.school")}</option>
+              <option value="PREUNIVERSITY">{t("cycles.preuniversity")}</option>
+            </select>
+          </div>
           <div>
             <label htmlFor="cycle-name" className="field-label">
               {t("cycles.name")}
@@ -206,7 +222,7 @@ export function CycleForm({
               />
             </div>
           </div>
-          <div>
+          {category === "SCHOOL" ? <div>
             <label htmlFor="cycle-fee" className="field-label">
               {t("pensionCatalog.generalFee")}
             </label>
@@ -246,7 +262,7 @@ export function CycleForm({
                 </button>
               </div>
             )}
-          </div>
+          </div> : null}
           {!detailsOnly && (
             <>
               <div>
@@ -291,6 +307,7 @@ export function CycleForm({
                 onChange={setGroups}
                 disabled={busy}
                 onReady={setReady}
+                requirePension
               />
             </>
           )}
@@ -309,7 +326,7 @@ export function CycleForm({
               {t("admin.cancel")}
             </button>
             <button
-              disabled={busy || !ready || !feesReady}
+              disabled={busy || !ready || (category === "SCHOOL" && !feesReady)}
               className="primary-button"
             >
               {t(

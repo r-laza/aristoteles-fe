@@ -154,6 +154,13 @@ async function createReceiptPdf(receipt: PaymentReceipt) {
         ? receipt.payer.relationshipOther
         : t(`receipts.relationships.${receipt.payer.relationship}`),
     );
+  const payerPhone = receipt.payer.phone?.trim();
+  row(
+    t("receipts.whatsapp"),
+    payerPhone && payerPhone.toLocaleLowerCase("es") !== "sin registrar"
+      ? payerPhone
+      : t("receipts.notRegistered"),
+  );
 
   heading(t("receipts.studentInformation"));
   row(t("receipts.student"), receipt.student.name);

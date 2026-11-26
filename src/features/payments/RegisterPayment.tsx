@@ -12,6 +12,11 @@ import {
 } from "../../services/payments.api";
 import { ApiError } from "../../services/api";
 import { money, periodLabel } from "./formatting";
+import {
+  payerFieldValue,
+  validatePayerInformation,
+  type PayerFieldErrors,
+} from "./payerValidation";
 
 const keyFor = (charge: Obligation) =>
   `${charge.paymentType}:${charge.period ?? "enrollment"}`;
@@ -31,6 +36,7 @@ export function RegisterPayment({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [payerErrors, setPayerErrors] = useState<PayerFieldErrors>({});
   const [documentType, setDocumentType] = useState<ReceiptDocumentType>(
     row.student.representativeDocumentType ?? "DNI",
   );
@@ -69,17 +75,10 @@ export function RegisterPayment({
   const choose = (charge: Obligation) => {
     const key = keyFor(charge);
     setError("");
-    if (charge.paymentType === "ENROLLMENT") {
-      applySelection([key]);
-      return;
-    }
-    const pensionsOnly = selected.filter((value) =>
-      value.startsWith("PENSION:"),
-    );
     applySelection(
-      pensionsOnly.includes(key)
-        ? pensionsOnly.filter((value) => value !== key)
-        : [...pensionsOnly, key],
+      selected.includes(key)
+        ? selected.filter((value) => value !== key)
+        : [...selected, key],
     );
   };
 
@@ -104,12 +103,13 @@ export function RegisterPayment({
       setError(t("payments.multipleFullPayment"));
       return;
     }
-    const first = selectedCharges[0];
-    const payerName = String(data.get("payerName")).trim();
-    const payerDocumentNumber = String(data.get("payerDocumentNumber")).trim();
-    const payerRelationshipOther = String(
+    const payerName = payerFieldValue(String(data.get("payerName") ?? ""));
+    const payerDocumentNumber = payerFieldValue(
+      String(data.get("payerDocumentNumber") ?? ""),
+    );
+    const payerRelationshipOther = payerFieldValue(String(
       data.get("payerRelationshipOther") ?? "",
-    ).trim();
+    ));
     const evidence = data.get("evidence");
     if (
       evidence instanceof File &&
@@ -122,23 +122,25 @@ export function RegisterPayment({
       setError(t("payments.invalidEvidence"));
       return;
     }
-    const validDocument =
-      documentType === "DNI"
-        ? /^\d{8}$/.test(payerDocumentNumber)
-        : /^[A-Za-z0-9]{6,12}$/.test(payerDocumentNumber);
-    if (!payerName || !validDocument) {
-      setError(t("receipts.invalidPayerInformation"));
+    const validationErrors = validatePayerInformation({
+      payerName,
+      documentType,
+      payerDocumentNumber,
+    });
+    if (Object.keys(validationErrors).length > 0) {
+      setPayerErrors(validationErrors);
+      setError("");
       return;
     }
+    setPayerErrors({});
     setBusy(true);
     setError("");
     try {
       const registration = await paymentsApi.register(row.id, {
-        paymentType: first.paymentType,
-        period: multiple ? null : first.period,
-        ...(multiple
-          ? { periods: selectedCharges.map((charge) => charge.period!) }
-          : {}),
+        obligations: selectedCharges.map((charge) => ({
+          paymentType: charge.paymentType,
+          period: charge.period,
+        })),
         amount,
         paymentDate: String(data.get("paymentDate")),
         paymentMethod,
@@ -150,18 +152,16 @@ export function RegisterPayment({
         payerRelationship,
         payerRelationshipOther,
       });
-      if (
-        evidence instanceof File &&
-        evidence.size > 0 &&
-        registration.payments[0]
-      ) {
-        try {
-          registration.payments[0] = await paymentsApi.uploadEvidence(
-            registration.payments[0].id,
-            evidence,
-          );
-        } catch {
-          registration.evidenceUploadFailed = true;
+      if (evidence instanceof File && evidence.size > 0) {
+        for (const [index, payment] of registration.payments.entries()) {
+          try {
+            registration.payments[index] = await paymentsApi.uploadEvidence(
+              payment.id,
+              evidence,
+            );
+          } catch {
+            registration.evidenceUploadFailed = true;
+          }
         }
       }
       onSaved(registration);
@@ -179,7 +179,11 @@ export function RegisterPayment({
   }
 
   return (
-    <form onSubmit={(event) => void submit(event)} className="space-y-6">
+    <form
+      onSubmit={(event) => void submit(event)}
+      className="space-y-6"
+      noValidate
+    >
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
@@ -216,10 +220,29 @@ export function RegisterPayment({
               <input
                 id="payer-name"
                 name="payerName"
-                required
-                defaultValue={row.student.representativeName}
-                className="field bg-white"
+                defaultValue={payerFieldValue(row.student.representativeName)}
+                placeholder={t("receipts.unregisteredPlaceholder")}
+                aria-invalid={Boolean(payerErrors.payerName)}
+                aria-describedby={
+                  payerErrors.payerName ? "payer-name-error" : undefined
+                }
+                onInput={() =>
+                  setPayerErrors((current) => ({
+                    ...current,
+                    payerName: undefined,
+                  }))
+                }
+                className={`field bg-white ${payerErrors.payerName ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
               />
+              {payerErrors.payerName && (
+                <p
+                  id="payer-name-error"
+                  role="alert"
+                  className="mt-1 text-sm text-red-600"
+                >
+                  {t("receipts.payerNameRequired")}
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="payer-document-type" className="field-label">
@@ -229,9 +252,13 @@ export function RegisterPayment({
                 id="payer-document-type"
                 name="payerDocumentType"
                 value={documentType}
-                onChange={(event) =>
+                onChange={(event) => {
                   setDocumentType(event.target.value as ReceiptDocumentType)
-                }
+                  setPayerErrors((current) => ({
+                    ...current,
+                    payerDocumentNumber: undefined,
+                  }));
+                }}
                 className="field bg-white"
               >
                 {(["DNI", "CE", "PASSPORT"] as const).map((type) => (
@@ -248,10 +275,39 @@ export function RegisterPayment({
               <input
                 id="payer-document-number"
                 name="payerDocumentNumber"
-                required
-                defaultValue={row.student.representativeDocumentNumber ?? ""}
-                className="field bg-white"
+                defaultValue={payerFieldValue(
+                  row.student.representativeDocumentNumber,
+                )}
+                placeholder={t("receipts.unregisteredPlaceholder")}
+                aria-invalid={Boolean(payerErrors.payerDocumentNumber)}
+                aria-describedby={
+                  payerErrors.payerDocumentNumber
+                    ? "payer-document-number-error"
+                    : undefined
+                }
+                onInput={() =>
+                  setPayerErrors((current) => ({
+                    ...current,
+                    payerDocumentNumber: undefined,
+                  }))
+                }
+                className={`field bg-white ${payerErrors.payerDocumentNumber ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
               />
+              {payerErrors.payerDocumentNumber && (
+                <p
+                  id="payer-document-number-error"
+                  role="alert"
+                  className="mt-1 text-sm text-red-600"
+                >
+                  {t(
+                    payerErrors.payerDocumentNumber === "required"
+                      ? "receipts.payerDocumentRequired"
+                      : documentType === "DNI"
+                        ? "receipts.payerDocumentInvalidDni"
+                        : "receipts.payerDocumentInvalidOther",
+                  )}
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="payer-relationship" className="field-label">
@@ -288,7 +344,8 @@ export function RegisterPayment({
                 <input
                   id="payer-relationship-other"
                   name="payerRelationshipOther"
-                  defaultValue={row.student.relationshipOther ?? ""}
+                  defaultValue={payerFieldValue(row.student.relationshipOther)}
+                  placeholder={t("receipts.unregisteredPlaceholder")}
                   maxLength={100}
                   className="field bg-white"
                 />
@@ -314,7 +371,10 @@ export function RegisterPayment({
                   className="text-sky-700 hover:text-sky-900"
                   onClick={() =>
                     applySelection(
-                      pensionCharges.map((charge) => keyFor(charge)),
+                      [
+                        ...selected.filter((key) => !key.startsWith("PENSION:")),
+                        ...pensionCharges.map((charge) => keyFor(charge)),
+                      ],
                     )
                   }
                 >
@@ -348,9 +408,7 @@ export function RegisterPayment({
                     <span className="flex items-start gap-3">
                       <input
                         className="mt-1"
-                        type={
-                          item.paymentType === "PENSION" ? "checkbox" : "radio"
-                        }
+                        type="checkbox"
                         name="obligation"
                         value={key}
                         checked={checked}

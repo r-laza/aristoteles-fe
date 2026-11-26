@@ -13,12 +13,14 @@ export function GroupAssignments({
   disabled,
   onReady,
   branchIds,
+  requirePension = true,
 }: {
   value: GroupAssignment[];
   onChange: (value: GroupAssignment[]) => void;
   disabled: boolean;
   onReady: (ready: boolean) => void;
   branchIds: number[];
+  requirePension?: boolean;
 }) {
   const [groups, setGroups] = useState<ReusableGroup[]>([]);
   const [fees, setFees] = useState<Pension[]>([]);
@@ -77,7 +79,7 @@ export function GroupAssignments({
               {t("cycles.createGroupsFirst")}
             </p>
           )}
-          {fees.length === 0 && (
+          {requirePension && fees.length === 0 && (
             <p className="text-sm text-slate-500">
               {t("pensionCatalog.createFirst")}
             </p>
@@ -92,7 +94,7 @@ export function GroupAssignments({
                   {groups.find((group) => group.id === row.groupId)?.name} · {groups.find((group) => group.id === row.groupId)?.branch.name}
                 </legend>
                 <div className="flex flex-wrap items-end gap-3">
-                  <div className="min-w-0 flex-1 basis-48">
+                  {requirePension && <div className="min-w-0 flex-1 basis-48">
                     <label
                       htmlFor={`group-fee-${row.groupId}`}
                       className="field-label"
@@ -131,7 +133,7 @@ export function GroupAssignments({
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </div>}
                   <button
                     type="button"
                     className="rounded-xl border px-4 py-2 text-sm font-medium text-red-700"

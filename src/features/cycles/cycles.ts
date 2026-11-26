@@ -6,25 +6,32 @@ export type AcademicCycle = {
   endDate: string;
   feeId: number | null;
   fee: EnrollmentFee | null;
+  category: CycleCategory;
+  preuniversityFee: string | null;
+  preuniversityInstallments: number | null;
+  preuniversityDueRule: PreuniversityDueRule | null;
   students: number;
   groups: number;
   branches: { branch: Branch }[];
+  status: "UPCOMING" | "ACTIVE" | "CLOSED";
 };
-export type CycleStatus = "active" | "upcoming" | "finished";
+export type CycleCategory = "SCHOOL" | "PREUNIVERSITY";
+export type PreuniversityDueRule = "FIFTEENTH" | "LAST_DAY";
+export type CycleStatus = "active" | "upcoming" | "closed";
 
 // Date-only values are compared without UTC conversion, including both endpoints.
 export function todayKey(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 export function cycleStatus(cycle: AcademicCycle, today: string): CycleStatus {
-  if (cycle.startDate > today) return "upcoming";
-  return cycle.endDate < today ? "finished" : "active";
+  void today;
+  return cycle.status.toLowerCase() as CycleStatus;
 }
 export function orderCycles(
   cycles: AcademicCycle[],
   today: string,
 ): AcademicCycle[] {
-  const rank = { active: 0, upcoming: 1, finished: 2 };
+  const rank = { active: 0, upcoming: 1, closed: 2 };
   return [...cycles].sort((a, b) => {
     const statusA = cycleStatus(a, today);
     const statusB = cycleStatus(b, today);
@@ -40,12 +47,17 @@ export function orderCycles(
 type CycleResponse = {
   feeId: number | null;
   fee: EnrollmentFee | null;
+  category: CycleCategory;
+  preuniversityFee: string | null;
+  preuniversityInstallments: number | null;
+  preuniversityDueRule: PreuniversityDueRule | null;
   id: number;
   name: string;
   startDate: string;
   endDate: string;
   _count: { enrollments: number; groups: number };
   branches: { branch: Branch }[];
+  status: "UPCOMING" | "ACTIVE" | "CLOSED";
 };
 function mapCycle(cycle: CycleResponse): AcademicCycle {
   return {
@@ -55,9 +67,14 @@ function mapCycle(cycle: CycleResponse): AcademicCycle {
     endDate: cycle.endDate.slice(0, 10),
     feeId: cycle.feeId,
     fee: cycle.fee,
+    category: cycle.category,
+    preuniversityFee: cycle.preuniversityFee,
+    preuniversityInstallments: cycle.preuniversityInstallments,
+    preuniversityDueRule: cycle.preuniversityDueRule,
     students: cycle._count.enrollments,
     groups: cycle._count.groups,
     branches: cycle.branches,
+    status: cycle.status,
   };
 }
 export async function readCycles(): Promise<AcademicCycle[]> {
@@ -69,7 +86,8 @@ export async function getCycle(id: string): Promise<AcademicCycle> {
 export type GroupAssignment = { groupId: number; pensionId: number | null };
 export async function saveCycle(
   cycle: {
-    feeId: number;
+    category: CycleCategory;
+    feeId: number | null;
     groups: GroupAssignment[];
     branchIds: number[];
     name: string;
@@ -84,6 +102,7 @@ export async function saveCycle(
       {
         groups: cycle.groups,
         branchIds: cycle.branchIds,
+        category: cycle.category,
         feeId: cycle.feeId,
         name: cycle.name,
         startDate: cycle.startDate,
@@ -108,7 +127,7 @@ export type EnrollmentFee = {
 export function feeAvailable(
   fee: EnrollmentFee,
   today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Guayaquil",
+    timeZone: "America/Lima",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -163,7 +182,7 @@ export const cycleApi = {
   saveBranch: (input: Pick<Branch, "name" | "address" | "details" | "isActive">, id?: number) => api<Branch>(id ? `/api/admin/branches/${id}` : "/api/admin/branches", input),
   updateDetails: (
     id: number,
-    input: { feeId: number; name: string; startDate: string; endDate: string },
+    input: { feeId: number | null; name: string; startDate: string; endDate: string },
   ) =>
     api<CycleResponse>(`/api/admin/cycles/${id}/details`, input).then(mapCycle),
   reusablePensions: () => api<CatalogPension[]>("/api/admin/pensions"),
@@ -176,6 +195,10 @@ export const cycleApi = {
     api<{ id: number }>(`/api/admin/pensions/${id}/delete`, {}),
   deleteCycle: (id: number) =>
     api<{ id: number }>(`/api/admin/cycles/${id}/delete`, {}),
+  activateCycle: (id: number) =>
+    api<CycleResponse>(`/api/admin/cycles/${id}/activate`, {}).then(mapCycle),
+  closeCycle: (id: number) =>
+    api<CycleResponse>(`/api/admin/cycles/${id}/close`, {}).then(mapCycle),
   groups: (id: string) => api<CycleGroup[]>(`/api/admin/cycles/${id}/groups`),
   addCycleGroup: (id: string, groupId: number, pensionId: number) =>
     api<CycleGroup>(`/api/admin/cycles/${id}/groups`, { groupId, pensionId }),
@@ -217,6 +240,8 @@ export const cycleApi = {
       discountPercent: string;
       pensionDiscountPercent: string;
       discountReason: string;
+      preuniversityInstallments?: number;
+      preuniversityDueRule?: PreuniversityDueRule;
     },
   ) => api<CycleEnrollment>(`/api/admin/cycles/${id}/enrollments`, input),
   transfer: (enrollmentId: number, input: { branchId: number; groupId: number; transferDate: string; reason: string }) => api<CycleEnrollment>(`/api/admin/cycles/enrollments/${enrollmentId}/transfer`, input),

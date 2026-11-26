@@ -4,7 +4,7 @@ import type { PaymentStatus } from "../../services/payments.api";
 const tones = {
   PAID: "bg-emerald-100 text-emerald-800 ring-emerald-600/20",
   PARTIAL: "bg-amber-100 text-amber-900 ring-amber-600/25",
-  PENDING: "bg-red-50 text-red-700 ring-red-600/20",
+  PENDING: "bg-amber-100 text-amber-900 ring-amber-600/25",
   OVERDUE: "bg-red-700 text-white ring-red-800/20",
   NA: "bg-slate-100 text-slate-500 ring-slate-500/10",
 };

@@ -21,6 +21,7 @@ export type PaymentRow = {
   lastPaymentDate: string | null;
   id: number;
   student: {
+    id: number;
     fullName: string;
     dni: string;
     representativeName: string;
@@ -28,6 +29,7 @@ export type PaymentRow = {
     representativeDocumentNumber: string | null;
     relationship: "FATHER" | "MOTHER" | "OTHER";
     relationshipOther: string | null;
+    primaryPhone: string | null;
   };
   group: { id: number; name: string };
   baseAmount: string;
@@ -35,6 +37,7 @@ export type PaymentRow = {
   amountDue: string;
   amountPaid: string;
   balance: string;
+  overdueBalance: string;
   status: PaymentStatus;
 };
 export type Balances = {
@@ -50,9 +53,10 @@ export const methods = [
 export type NewPaymentMethod = (typeof methods)[number];
 export type PaymentMethod = NewPaymentMethod | "CARD" | "OTHER";
 export type PaymentInput = {
-  paymentType: PaymentType;
-  period: string | null;
+  paymentType?: PaymentType;
+  period?: string | null;
   periods?: string[];
+  obligations?: { paymentType: PaymentType; period: string | null }[];
   amount: string;
   paymentDate: string;
   paymentMethod: NewPaymentMethod;
@@ -116,6 +120,7 @@ export type PaymentReceipt = {
     documentNumber: string;
     relationship: ReceiptRelationship | null;
     relationshipOther: string | null;
+    phone: string | null;
   };
   student: { name: string; group: string; cycle: string };
   payment: {

@@ -20,6 +20,7 @@ export function CyclePayments({
   const { data, loading, error, refresh } = useCyclePayments(cycleId);
   const [filters, setFilters] = useState(emptyFilters);
   const [success, setSuccess] = useState(initialSuccess);
+  const [page, setPage] = useState(1);
   if (loading)
     return (
       <p role="status" className="py-8 text-sm text-slate-500">
@@ -35,7 +36,10 @@ export function CyclePayments({
         </button>
       </div>
     );
-  const rows = filterPaymentRows(data.rows, filters);
+  const rows = filterPaymentRows(data.rows, filters).sort((a, b) => Number(b.balance) - Number(a.balance));
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const visibleRows = rows.slice((page - 1) * pageSize, page * pageSize);
   const groups = Array.from(
     new Map(data.rows.map((row) => [row.group.id, row.group])).values(),
   );
@@ -84,7 +88,7 @@ export function CyclePayments({
             filters={filters}
             groups={groups}
             months={months}
-            onChange={setFilters}
+            onChange={(value) => { setFilters(value); setPage(1); }}
           />
           {filtered && (
             <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
@@ -113,13 +117,14 @@ export function CyclePayments({
           </div>
         ) : (
           <PaymentsTable
-            rows={rows}
+            rows={visibleRows}
             onRegister={(row) => {
               setSuccess(false);
               onRegister(row);
             }}
           />
         )}
+        {rows.length > pageSize && <nav aria-label={t("payments.pagination")} className="flex items-center justify-center gap-4 border-t p-4"><button className="secondary-button" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>{t("adminDashboard.previous")}</button><span className="text-sm">{t("adminDashboard.pageOf", { page, total: totalPages })}</span><button className="secondary-button" disabled={page === totalPages} onClick={() => setPage((value) => value + 1)}>{t("adminDashboard.next")}</button></nav>}
       </section>
     </>
   );

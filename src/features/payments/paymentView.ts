@@ -54,9 +54,6 @@ const normalize = (value: string) =>
 export function filterPaymentRows(
   rows: PaymentRow[],
   filters: PaymentFiltersValue,
-  today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Guayaquil",
-  }).format(new Date()),
 ) {
   return rows.filter((row) => {
     const charges = scopedCharges(row, filters);
@@ -65,7 +62,7 @@ export function filterPaymentRows(
       (!filters.group || String(row.group.id) === filters.group) &&
       (charges.length > 0 || (!filters.type && !filters.month)) &&
       (!filters.status ||
-        (accountStatus(row.obligations, today) ?? "NA") === filters.status)
+        (row.status ?? "NA") === filters.status)
     );
   });
 }
@@ -78,28 +75,23 @@ export function pendingFor(rows: PaymentRow[], type: PaymentType) {
   );
 }
 
-// Future installments remain in the total balance, but do not make an
-// otherwise up-to-date student overdue.
+// Account-level status shared with the server. Overdue debt has priority over
+// future pending installments; partial payment never creates a fourth status.
 export function accountStatus(
   charges: Obligation[],
   today: string,
+  warningDays = 7,
 ): PaymentStatus | null {
   if (!charges.some((c) => Number(c.amountDue) > 0)) return null;
   const pending = charges.filter((c) => Number(c.balance) > 0);
   if (!pending.length) return "PAID";
-  if (pending.some((c) => c.dueDate && c.dueDate < today)) return "PENDING";
-  if (pending.some((c) => Number(c.amountPaid) > 0)) return "PARTIAL";
-  if (
-    pending.some(
-      (c) =>
-        c.paymentType === "ENROLLMENT" || (c.dueDate && c.dueDate <= today),
-    )
-  ) {
-    return charges.some((c) => Number(c.amountPaid) > 0)
-      ? "PARTIAL"
-      : "PENDING";
-  }
-  return charges.some((c) => Number(c.amountPaid) > 0) ? "PAID" : "PENDING";
+  if (pending.some((c) => c.dueDate && c.dueDate < today)) return "OVERDUE";
+  const warningThrough = new Date(`${today}T00:00:00Z`);
+  warningThrough.setUTCDate(warningThrough.getUTCDate() + warningDays);
+  const boundary = warningThrough.toISOString().slice(0, 10);
+  return pending.some((c) => !c.dueDate || c.dueDate <= boundary)
+    ? "PENDING"
+    : "PAID";
 }
 export function pensionSummary(row: PaymentRow, today: string) {
   const installments = row.obligations.filter(

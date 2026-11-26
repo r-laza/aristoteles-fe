@@ -7,13 +7,14 @@ const source = (path) =>
 
 test("payments use cards below desktop and preserve the desktop table", async () => {
   const payments = await source("features/payments/PaymentsTable.tsx");
-  assert.match(payments, /grid gap-4 lg:hidden/);
+  assert.match(payments, /grid gap-4 p-4 lg:hidden/);
   assert.match(payments, /hidden overflow-x-auto lg:block/);
-  assert.match(payments, /payments\.types\.ENROLLMENT/);
-  assert.match(payments, /payments\.pensions/);
+  assert.match(payments, /row\.student\.id/);
+  assert.match(payments, /payments\.totalPaid/);
   assert.match(payments, /payments\.totalBalance/);
-  assert.match(payments, /payments\.overallStatus/);
-  assert.match(payments, /primary-button mt-4 min-h-12 w-full/);
+  assert.match(payments, /overallStatus/);
+  assert.match(payments, /payments\.overdueBalance/);
+  assert.doesNotMatch(payments, /payments\.viewDetail|\bEye\b|onDetail/);
 
   for (const width of [320, 375, 391, 400, 768])
     assert.ok(width < 1024, `${width}px uses payment cards`);

@@ -1,8 +1,8 @@
 import { money, periodLabel } from "../../features/payments/formatting";
 import { t } from "../../lib/i18n";
-import type { AdminDashboardResponse } from "../../types/admin-dashboard";
+import type { DashboardSummary } from "../../types/admin-dashboard";
 
-type Monthly = AdminDashboardResponse["monthlyCollected"][number];
+type Monthly = DashboardSummary["monthlyCollected"][number];
 
 const amount = (value: string) => Math.round(Number(value) * 100);
 

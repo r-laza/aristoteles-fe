@@ -85,7 +85,7 @@ export function PaymentFilters({
           }
         >
           <option value="">{t("payments.all")}</option>
-          {["PAID", "PARTIAL", "PENDING", "NA"].map((item) => (
+          {["PAID", "PENDING", "OVERDUE"].map((item) => (
             <option key={item} value={item}>
               {t(`payments.accountStatus.${item}`)}
             </option>

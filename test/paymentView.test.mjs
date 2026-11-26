@@ -36,6 +36,7 @@ const february = {
 };
 const row = {
   id: 1,
+  status: "OVERDUE",
   student: { fullName: "María Pérez" },
   group: { id: 2 },
   obligations: [enrollment, january, february],
@@ -46,6 +47,18 @@ test("money uses the Peruvian sol symbol", async () => {
     await readFile(new URL("../src/locales/es.json", import.meta.url), "utf8"),
   );
   assert.equal(locale.cycles.amount, "S/{{amount}}");
+});
+
+test("visible terminology uses módulo instead of the legacy term", async () => {
+  const localeText = await readFile(
+    new URL("../src/locales/es.json", import.meta.url),
+    "utf8",
+  );
+  const locale = JSON.parse(localeText);
+  assert.doesNotMatch(localeText, new RegExp("matr[i\\u00ed]cul", "i"));
+  assert.equal(locale.navigation.enrollmentsPensions, "Módulos y pensiones");
+  assert.equal(locale.payments.enrollmentPending, "Pendiente de módulo");
+  assert.equal(locale.payments.types.ENROLLMENT, "Módulo");
 });
 
 test("settled enrollment does not hide outstanding pensions", () => {
@@ -135,11 +148,11 @@ test("future cycles still expose the full pension schedule", async () => {
   assert.equal(summary.installments.length, 2);
   assert.equal(summary.paid, 0);
   assert.equal(summary.next.period, "2027-01");
-  assert.equal(summary.status, "PENDING");
+  assert.equal(summary.status, "PAID");
   assert.equal(accountStatus([], "2026-09-20"), null);
 });
 
-test("paid current installments and unpaid future installments can be up to date", async () => {
+test("future unpaid installments are pending and overdue debt has priority", async () => {
   const { accountStatus, pensionSummary } =
     await import("../src/features/payments/paymentView.ts");
   const charges = [
@@ -147,7 +160,7 @@ test("paid current installments and unpaid future installments can be up to date
     { ...february, dueDate: "2026-02-10" },
   ];
   assert.equal(accountStatus(charges, "2026-01-20"), "PAID");
-  assert.equal(accountStatus(charges, "2026-02-11"), "PENDING");
+  assert.equal(accountStatus(charges, "2026-02-11"), "OVERDUE");
   assert.equal(
     pensionSummary({ ...row, obligations: charges }, "2026-01-20").paid,
     1,
@@ -164,6 +177,22 @@ test("paid current installments and unpaid future installments can be up to date
       ],
       "2026-02-01",
     ),
-    "PARTIAL",
+    "PAID",
   );
+  assert.equal(
+    accountStatus([
+      { ...january, dueDate: "2026-01-10" },
+      { ...february, dueDate: "2026-03-10" },
+    ], "2026-02-01"),
+    "OVERDUE",
+  );
+});
+
+test("warning period includes its boundary and excludes later installments", async () => {
+  const { accountStatus } = await import("../src/features/payments/paymentView.ts");
+  assert.equal(accountStatus([{ ...february, dueDate: "2027-01-17" }], "2027-01-10", 7), "PENDING");
+  assert.equal(accountStatus([{ ...february, dueDate: "2027-01-18" }], "2027-01-10", 7), "PAID");
+  assert.equal(accountStatus([{ ...february, dueDate: "2027-01-10" }], "2027-01-10", 7), "PENDING");
+  assert.equal(accountStatus([{ ...february, dueDate: "2027-01-09" }], "2027-01-10", 7), "OVERDUE");
+  assert.equal(accountStatus([{ ...february, dueDate: "2027-01-09", amountPaid: "80.50", balance: "0" }], "2027-01-10", 7), "PAID");
 });

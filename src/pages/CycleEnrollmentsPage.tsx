@@ -43,6 +43,8 @@ function EnrollmentConfirmation({
   const [error, setError] = useState("");
   const [enrollmentPercent, setEnrollmentPercent] = useState("0");
   const [pensionPercent, setPensionPercent] = useState("0");
+  const [preuniversityInstallments, setPreuniversityInstallments] = useState(1);
+  const [preuniversityDueRule, setPreuniversityDueRule] = useState<"FIFTEENTH" | "LAST_DAY">("FIFTEENTH");
   const feeDiscount = calculateDiscount(
     Number(cycle.fee?.amount ?? 0),
     enrollmentPercent,
@@ -55,7 +57,7 @@ function EnrollmentConfirmation({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
-      !cycle.fee ||
+      (cycle.category === "SCHOOL" && !cycle.fee) ||
       !group.pension ||
       !feeDiscount.valid ||
       !pensionDiscount.valid
@@ -74,6 +76,10 @@ function EnrollmentConfirmation({
         discountPercent: enrollmentPercent || "0",
         pensionDiscountPercent: pensionPercent || "0",
         discountReason: String(data.get("discountReason") ?? "").trim(),
+        ...(cycle.category === "PREUNIVERSITY" ? {
+          preuniversityInstallments,
+          preuniversityDueRule,
+        } : {}),
       });
       onEnrolled(enrollment);
     } catch (cause) {
@@ -101,7 +107,7 @@ function EnrollmentConfirmation({
             ["enrollmentPage.student", student.fullName],
             ["enrollmentPage.cycle", cycle.name],
             ["enrollmentPage.group", group.name],
-            ["enrollmentPage.enrollmentFee", money(cycle.fee?.amount ?? 0)],
+            ...(cycle.category === "SCHOOL" ? [["enrollmentPage.enrollmentFee", money(cycle.fee?.amount ?? 0)]] : []),
             [
               "enrollmentPage.monthlyPension",
               money(group.pension?.amount ?? 0),
@@ -114,8 +120,28 @@ function EnrollmentConfirmation({
           ))}
         </dl>
         <fieldset disabled={busy} className="space-y-4">
+          {cycle.category === "PREUNIVERSITY" && (
+            <section className="rounded-xl border border-slate-200 p-4">
+              <h3 className="font-semibold text-sky-950">{t("enrollmentPage.installmentPlan")}</h3>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="preuniversity-installments" className="field-label">{t("enrollmentPage.installmentCount")}</label>
+                  <select id="preuniversity-installments" className="field" value={preuniversityInstallments} onChange={(event) => setPreuniversityInstallments(Number(event.target.value))}>
+                    {[1, 2, 3].map((count) => <option key={count} value={count}>{count}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="preuniversity-due-rule" className="field-label">{t("enrollmentPage.installmentDueDate")}</label>
+                  <select id="preuniversity-due-rule" className="field" value={preuniversityDueRule} onChange={(event) => setPreuniversityDueRule(event.target.value as "FIFTEENTH" | "LAST_DAY")}>
+                    <option value="FIFTEENTH">{t("cycles.fifteenth")}</option>
+                    <option value="LAST_DAY">{t("cycles.lastDay")}</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
+            {cycle.category === "SCHOOL" && <div>
               <label htmlFor="enrollment-discount" className="field-label">
                 {t("enrollmentPage.enrollmentDiscount")}
               </label>
@@ -144,7 +170,7 @@ function EnrollmentConfirmation({
                     : t("cycleDetail.invalidDiscount")}
                 </p>
               </div>
-            </div>
+            </div>}
             <div>
               <label htmlFor="pension-discount" className="field-label">
                 {t("enrollmentPage.pensionDiscount")}
@@ -305,7 +331,7 @@ function TransferModal({
             type="date"
             required
             defaultValue={new Intl.DateTimeFormat("en-CA", {
-              timeZone: "America/Guayaquil",
+              timeZone: "America/Lima",
             }).format(new Date())}
             className="field"
           />
@@ -489,7 +515,7 @@ export function CycleEnrollmentsPage() {
                 {cycle.name}
               </h2>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div>
+                {cycle.category === "SCHOOL" && <div>
                   <dt className="text-sm text-slate-500">
                     {t("enrollmentPage.dates")}
                   </dt>
@@ -497,7 +523,7 @@ export function CycleEnrollmentsPage() {
                     {formatCycleDate(cycle.startDate)} –{" "}
                     {formatCycleDate(cycle.endDate)}
                   </dd>
-                </div>
+                </div>}
                 <div>
                   <dt className="text-sm text-slate-500">
                     {t("enrollmentPage.enrollmentFee")}
@@ -635,7 +661,7 @@ export function CycleEnrollmentsPage() {
                         </p>
                         <button
                           type="button"
-                          disabled={!selectedGroup?.pension || !cycle.fee}
+                          disabled={!selectedGroup?.pension || (cycle.category === "SCHOOL" && !cycle.fee)}
                           onClick={() => setSelectedStudent(student)}
                           className="primary-button mt-4 min-h-12 w-full disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100"
                         >
@@ -675,7 +701,7 @@ export function CycleEnrollmentsPage() {
                             <td className="px-4 py-4 text-right">
                               <button
                                 type="button"
-                                disabled={!selectedGroup?.pension || !cycle.fee}
+                                disabled={!selectedGroup?.pension || (cycle.category === "SCHOOL" && !cycle.fee)}
                                 onClick={() => setSelectedStudent(student)}
                                 className="primary-button ml-auto disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100 disabled:transition-none disabled:hover:bg-slate-200"
                               >
@@ -738,7 +764,7 @@ export function CycleEnrollmentsPage() {
             />
           </PersonModal>
         )}
-        {selectedStudent && cycle && selectedGroup?.pension && cycle.fee && (
+        {selectedStudent && cycle && selectedGroup?.pension && (cycle.category === "PREUNIVERSITY" || cycle.fee) && (
           <EnrollmentConfirmation
             cycle={cycle}
             group={selectedGroup}
@@ -774,12 +800,12 @@ export function CycleEnrollmentsPage() {
                 ],
                 ["enrollmentPage.cycle", cycle.name],
                 ["enrollmentPage.group", completedEnrollment.group.name],
-                [
+                ...(cycle.category === "SCHOOL" ? [[
                   "enrollmentPage.finalEnrollment",
                   money(completedEnrollment.enrollment.finalAmount),
-                ],
+                ]] : []),
                 [
-                  "enrollmentPage.finalMonthlyPension",
+                  cycle.category === "SCHOOL" ? "enrollmentPage.finalMonthlyPension" : "enrollmentPage.finalPension",
                   money(completedEnrollment.enrollment.pensionAmount ?? 0),
                 ],
               ].map(([label, value]) => (

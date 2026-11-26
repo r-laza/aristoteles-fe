@@ -4,35 +4,46 @@ import {
   DeleteCycleModal,
 } from "../features/cycles/CycleActions";
 import { CycleForm } from "../features/cycles/CycleForm";
+import { CycleModal } from "../features/cycles/CycleModal";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { CalendarDays, Plus } from "lucide-react";
+import { CalendarDays, LockKeyhole, Plus } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { t } from "../lib/i18n";
 import {
   cycleStatus,
+  cycleApi,
   formatCycleDate,
   orderCycles,
   readCycles,
   todayKey,
   type AcademicCycle,
+  type Branch,
 } from "../features/cycles/cycles";
 
 export function AcademicCyclesPage() {
   const navigate = useNavigate();
   const [cycles, setCycles] = useState<AcademicCycle[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchId, setBranchId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [success, setSuccess] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<AcademicCycle | null>(null);
+  const [transitioning, setTransitioning] = useState<AcademicCycle | null>(null);
+  const [transitionBusy, setTransitionBusy] = useState(false);
   const [today, setToday] = useState(todayKey);
   useEffect(() => {
     let cancelled = false;
-    readCycles()
-      .then((data) => {
-        if (!cancelled) setCycles(data);
+    Promise.all([readCycles(), cycleApi.branches()])
+      .then(([data, branchList]) => {
+        if (!cancelled) {
+          setCycles(data);
+          setBranches(branchList);
+          setBranchId(branchList[0]?.id ?? null);
+        }
       })
       .catch(() => {
         if (!cancelled) setLoadError(true);
@@ -49,8 +60,11 @@ export function AcademicCyclesPage() {
   const badge = {
     active: "bg-cyan-100 text-sky-800",
     upcoming: "bg-sky-50 text-sky-700",
-    finished: "bg-slate-100 text-slate-500",
+    closed: "bg-slate-100 text-slate-500",
   };
+  const visibleCycles = branchId === null
+    ? []
+    : cycles.filter((cycle) => cycle.branches.some(({ branch }) => branch.id === branchId));
   return (
     <AppLayout>
       <div className="py-5">
@@ -80,6 +94,21 @@ export function AcademicCyclesPage() {
             {t(success)}
           </p>
         )}
+        <div className="mb-6 max-w-sm">
+          <label htmlFor="cycle-branch" className="field-label">
+            {t("cycles.branch")}
+          </label>
+          <select
+            id="cycle-branch"
+            className="field"
+            value={branchId ?? ""}
+            onChange={(event) => setBranchId(Number(event.target.value))}
+          >
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>{branch.name}</option>
+            ))}
+          </select>
+        </div>
         {loading ? (
           <p role="status">{t("cycles.loading")}</p>
         ) : loadError ? (
@@ -89,7 +118,7 @@ export function AcademicCyclesPage() {
           >
             {t("cycles.loadError")}
           </p>
-        ) : cycles.length === 0 ? (
+        ) : visibleCycles.length === 0 ? (
           <div className="rounded-2xl border border-slate-100 bg-white px-6 py-12 text-center shadow-sm">
             <CalendarDays size={32} className="mx-auto mb-4 text-cyan-600" />
             <h2 className="text-lg font-semibold text-sky-950">
@@ -101,7 +130,7 @@ export function AcademicCyclesPage() {
           </div>
         ) : (
           <ol className="space-y-4">
-            {orderCycles(cycles, today).map((cycle) => {
+            {orderCycles(visibleCycles, today).map((cycle) => {
               const status = cycleStatus(cycle, today);
               return (
                 <li key={cycle.id}>
@@ -187,6 +216,18 @@ export function AcademicCyclesPage() {
                         </div>
                       ))}
                     </dl>
+                    {cycle.status !== "CLOSED" && (
+                      <div className="relative z-10 mt-5 flex justify-end">
+                        <button
+                          type="button"
+                          className={cycle.status === "UPCOMING" ? "primary-button min-h-11 w-full justify-center sm:w-auto" : "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:w-auto"}
+                          onClick={() => setTransitioning(cycle)}
+                        >
+                          {cycle.status === "ACTIVE" && <LockKeyhole size={17} aria-hidden="true" />}
+                          {t(cycle.status === "UPCOMING" ? "cycles.activate" : "cycles.closeCycle")}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </li>
               );
@@ -232,6 +273,39 @@ export function AcademicCyclesPage() {
               });
             }}
           />
+        )}
+        {transitioning && (
+          <CycleModal
+            title={t(transitioning.status === "UPCOMING" ? "cycles.activateTitle" : "cycles.closeTitle")}
+            busy={transitionBusy}
+            onClose={() => setTransitioning(null)}
+          >
+            <p className="text-sm leading-6 text-slate-600">
+              {t(transitioning.status === "UPCOMING" ? "cycles.activateWarning" : "cycles.closeWarning")}
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button className="secondary-button" disabled={transitionBusy} onClick={() => setTransitioning(null)}>{t("admin.cancel")}</button>
+              <button
+                className={transitioning.status === "UPCOMING" ? "primary-button min-h-11 justify-center" : "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"}
+                disabled={transitionBusy}
+                onClick={() => {
+                  setTransitionBusy(true);
+                  const action = transitioning.status === "UPCOMING" ? cycleApi.activateCycle : cycleApi.closeCycle;
+                  action(transitioning.id)
+                    .then((updated) => {
+                      setCycles((current) => current.map((cycle) => cycle.id === updated.id ? updated : cycle));
+                      setTransitioning(null);
+                      setSuccess(updated.status === "ACTIVE" ? "cycles.activated" : "cycles.closedSuccess");
+                    })
+                    .catch(() => setSuccess("cycles.transitionError"))
+                    .finally(() => setTransitionBusy(false));
+                }}
+              >
+                {transitioning.status === "ACTIVE" && <LockKeyhole size={17} aria-hidden="true" />}
+                {transitionBusy ? t("admin.saving") : t(transitioning.status === "UPCOMING" ? "cycles.activate" : "cycles.closeCycle")}
+              </button>
+            </div>
+          </CycleModal>
         )}
       </div>
     </AppLayout>
