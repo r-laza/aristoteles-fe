@@ -35,7 +35,6 @@ const studentNavItems: NavItem[] = [
   { label: t("navigation.home"), icon: House, to: "/" },
   { label: t("navigation.courses"), icon: BookOpen, to: "/courses" },
   { label: t("navigation.tasks"), icon: ClipboardList, to: "/tasks" },
-  { label: t("navigation.profile"), icon: UserRound, to: "/profile" },
 ];
 
 const adminSections = [
@@ -44,7 +43,6 @@ const adminSections = [
     label: t("navigation.administration"),
     items: [
       { label: t("navigation.users"), icon: Users, to: "/admin/users" },
-      { label: t("navigation.profile"), icon: UserRound, to: "/profile" },
     ],
   },
   {
@@ -110,8 +108,6 @@ function activeAdminPath(pathname: string, search: string): string {
     return "/admin/enrollments";
   void search;
   if (pathname === "/admin" || pathname === "/admin/") return "/admin";
-  if (pathname === "/profile" || pathname.startsWith("/profile/"))
-    return "/profile";
   for (const path of [
     "/admin/enrollments-pensions",
     "/admin/payments",

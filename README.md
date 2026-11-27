@@ -52,11 +52,11 @@ La sesión se restaura con `/api/auth/me`; el botón de salida está junto al pe
 
 Los textos de interfaz están en `src/locales/es.json`. Verifica los cambios con `npm run build` y `npm run lint`.
 
-### Administradores y perfil
+### Administradores
 
 Los administradores principales y regulares mantienen las rutas autorizadas por el rol `ADMIN`. En Personas → Administradores, solo el nivel `MAIN` muestra creación y edición; el nivel `REGULAR` puede consultar la lista. Los principales seleccionan el nivel al crear o editar un administrador. Los permisos también se validan en el backend y se actualizan en la sesión cuando se modifica la propia cuenta.
 
-`/profile` permite a ambos niveles actualizar su nombre, usuario y contraseña opcional, sin controles para cambiar permisos o activar/desactivar cuentas. El usuario o la contraseña solo pueden cambiarse con la contraseña actual. Las páginas de perfil de otros roles conservan su comportamiento anterior.
+Personas es el módulo de gestión de cuentas de los administradores. Perfil no aparece en su navegación y `/profile` los redirige a `/admin/users`. La ruta conserva el comportamiento anterior para estudiantes y docentes; las APIs compartidas del backend permanecen intactas.
 
 ## Ciclos académicos
 

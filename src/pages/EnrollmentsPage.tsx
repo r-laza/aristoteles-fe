@@ -396,7 +396,7 @@ export function EnrollmentsPage() {
                         <th className="px-5 py-3">
                           {t("enrollmentPage.student")}
                         </th>
-                        <th className="px-5 py-3 text-right">
+                        <th className="px-5 py-3 text-center">
                           {t("admin.actions")}
                         </th>
                         <th className="px-5 py-3">{t("enrollmentPage.dni")}</th>
@@ -414,8 +414,8 @@ export function EnrollmentsPage() {
                           <td className="px-5 py-4 font-semibold text-sky-950">
                             {enrollment.student.fullName}
                           </td>
-                          <td className="px-5 py-4">
-                            <div className="flex justify-end">
+                          <td className="px-5 py-4 text-center align-middle">
+                            <div className="flex items-center justify-center [&>button]:w-auto">
                               <ManagePaymentsButton
                                 onClick={() =>
                                   navigate(paymentPath(enrollment.id))

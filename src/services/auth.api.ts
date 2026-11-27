@@ -5,8 +5,6 @@ export const authApi = {
   login: (credentials: Credentials) =>
     api<User>("/api/auth/login", credentials),
   logout: () => api<void>("/api/auth/logout", {}),
-  updateProfile: (input: { fullName: string; username: string; currentPassword: string; password?: string }) =>
-    api<User>("/api/auth/profile", input),
 };
 export const usersApi = {
   list: () => api<User[]>("/api/admin/users"),

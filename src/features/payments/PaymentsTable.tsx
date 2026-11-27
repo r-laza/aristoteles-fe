@@ -81,8 +81,10 @@ export function PaymentsTable({ rows, onRegister }: Props) {
                     DNI {row.student.dni}
                   </div>
                 </td>
-                <td className="px-4 py-4 text-center">
-                  <Action row={row} onClick={onRegister} />
+                <td className="px-4 py-4 text-center align-middle">
+                  <div className="flex items-center justify-center [&>button]:w-auto">
+                    <Action row={row} onClick={onRegister} />
+                  </div>
                 </td>
                 <td className="px-4 py-4">{row.group.name}</td>
                 <td className="px-4 py-4 font-semibold tabular-nums">
@@ -139,7 +141,7 @@ export function ManagePaymentsButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="primary-button min-h-10 w-full justify-center !px-3 !text-xs lg:w-auto"
+      className="primary-button min-h-10 w-full justify-center whitespace-nowrap !px-3 !text-xs lg:w-auto"
     >
       <Wallet size={15} aria-hidden="true" />
       {t("payments.manage")}

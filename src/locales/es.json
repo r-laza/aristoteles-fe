@@ -271,16 +271,6 @@
     "logoutError": "No se pudo cerrar la sesión. Inténtalo nuevamente.",
     "role": "Rol"
   },
-  "profile": {
-    "subtitle": "Actualiza tus datos personales sin cambiar tus permisos.",
-    "currentPassword": "Contraseña actual",
-    "passwordHelp": "Ingresa tu contraseña actual para cambiar el usuario o la contraseña.",
-    "save": "Guardar perfil",
-    "saved": "Perfil actualizado exitosamente.",
-    "invalidPassword": "La contraseña actual no es correcta.",
-    "saveError": "No se pudo guardar el perfil. Verifica los datos e inténtalo nuevamente.",
-    "refreshError": "El perfil se guardó, pero no se pudo actualizar la información de la sesión."
-  },
   "admin": {
     "permissionLevel": "Nivel de permisos",
     "levels": {
