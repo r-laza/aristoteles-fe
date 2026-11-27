@@ -1,10 +1,12 @@
 import { api } from "./api";
-import type { Credentials, Person, Role, User } from "../auth/types";
+import type { AdminLevel, Credentials, Person, Role, User } from "../auth/types";
 export const authApi = {
   me: () => api<User>("/api/auth/me"),
   login: (credentials: Credentials) =>
     api<User>("/api/auth/login", credentials),
   logout: () => api<void>("/api/auth/logout", {}),
+  updateProfile: (input: { fullName: string; username: string; currentPassword: string; password?: string }) =>
+    api<User>("/api/auth/profile", input),
 };
 export const usersApi = {
   list: () => api<User[]>("/api/admin/users"),
@@ -18,6 +20,7 @@ export type CreatePersonInput =
       username: string;
       password: string;
       isActive: boolean;
+      adminLevel?: AdminLevel;
     }
   | {
       role: "STUDENT";
@@ -55,6 +58,7 @@ export const peopleApi = {
       username: string;
       password?: string;
       isActive: boolean;
+      adminLevel?: AdminLevel;
     },
   ) => api<Person>(`/api/admin/people/users/${id}`, input),
   manageAccess: (

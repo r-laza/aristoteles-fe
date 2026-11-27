@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import {
   Link,
@@ -11,6 +11,7 @@ import { readCycles } from "../features/cycles/cycles";
 import { RegisterPayment } from "../features/payments/RegisterPayment";
 import { PaymentDialog } from "../features/payments/PaymentDialog";
 import { PaymentHistory } from "../features/payments/PaymentHistory";
+import { uploadPaymentEvidence } from "../features/payments/paymentFeedback";
 import {
   downloadReceiptPdf,
   viewReceiptPdf,
@@ -52,6 +53,15 @@ export function RegisterPaymentPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [completed, setCompleted] = useState<PaymentRegistration | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
+  const [refreshingBalances, setRefreshingBalances] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const [pendingEvidence, setPendingEvidence] =
+    useState<{ file: File; ids: number[] } | null>(null);
+  const [uploadingEvidence, setUploadingEvidence] = useState(false);
+  const evidenceBusy = useRef(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
   const [activeTab, setActiveTab] = useState<"register" | "history">(
@@ -62,6 +72,8 @@ export function RegisterPaymentPage() {
   const requestedCycleId =
     Number.isInteger(cycleIdParam) && cycleIdParam > 0 ? cycleIdParam : null;
   const returnToCycle = searchParams.get("returnTo") === "cycle";
+  const returnToEnrollments = searchParams.get("returnTo") === "enrollments";
+  const returnBranchId = Number(searchParams.get("branchId"));
 
   useEffect(() => {
     let cancelled = false;
@@ -94,16 +106,82 @@ export function RegisterPaymentPage() {
   const cyclePath = data?.cycleId
     ? `/admin/cycles/${data.cycleId}`
     : paymentsPath;
+  const enrollmentsPath = data?.cycleId
+    ? `/admin/enrollments?cycleId=${data.cycleId}${Number.isInteger(returnBranchId) && returnBranchId > 0 ? `&branchId=${returnBranchId}` : ""}`
+    : "/admin/enrollments";
+  const returnPath = returnToEnrollments
+    ? enrollmentsPath
+    : returnToCycle
+      ? cyclePath
+      : paymentsPath;
+
+  async function refreshBalances() {
+    if (!data) return;
+    setRefreshingBalances(true);
+    setRefreshError("");
+    try {
+      const balances = await paymentsApi.balances(data.cycleId);
+      const row = balances.rows.find((item) => item.id === enrollmentId);
+      if (!row) {
+        setRefreshError(t("payments.balanceRefreshError"));
+        return;
+      }
+      setData({ row, cycleId: data.cycleId });
+    } catch {
+      setRefreshError(t("payments.balanceRefreshError"));
+    } finally {
+      setRefreshingBalances(false);
+    }
+  }
+
+  async function attachEvidence(pending: { file: File; ids: number[] }) {
+    if (evidenceBusy.current) return;
+    evidenceBusy.current = true;
+    setUploadingEvidence(true);
+    try {
+      const failedIds = await uploadPaymentEvidence(
+        pending.ids,
+        pending.file,
+        paymentsApi.uploadEvidence,
+      );
+      setPendingEvidence(
+        failedIds.length ? { file: pending.file, ids: failedIds } : null,
+      );
+      setHistoryVersion((value) => value + 1);
+    } finally {
+      evidenceBusy.current = false;
+      setUploadingEvidence(false);
+    }
+  }
+
+  function paymentSaved(registration: PaymentRegistration, evidence?: File) {
+    setCompleted(registration);
+    setActiveTab("history");
+    setHistoryVersion((value) => value + 1);
+    void refreshBalances();
+    if (evidence) {
+      const pending = {
+        file: evidence,
+        ids: registration.payments.map((payment) => payment.id),
+      };
+      setPendingEvidence(pending);
+      void attachEvidence(pending);
+    }
+  }
 
   return (
     <AppLayout>
       <div className="mx-auto w-full max-w-[1600px] py-5">
         <Link
-          to={paymentsPath}
+          to={returnPath}
           className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-sky-800 hover:text-sky-950"
         >
           <ArrowLeft size={18} aria-hidden="true" />
-          {t("payments.backToManagement")}
+          {t(
+            returnToEnrollments
+              ? "payments.backToEnrollments"
+              : "payments.backToManagement",
+          )}
         </Link>
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight text-sky-950">
@@ -179,6 +257,11 @@ export function RegisterPaymentPage() {
                   type="button"
                   role="tab"
                   aria-selected={activeTab === tab}
+                  disabled={
+                    registering ||
+                    (tab === "register" &&
+                      (refreshingBalances || Boolean(refreshError)))
+                  }
                   onClick={() => setActiveTab(tab)}
                   className={`border-b-2 px-4 py-3 text-sm font-semibold ${activeTab === tab ? "border-sky-700 text-sky-900" : "border-transparent text-slate-500 hover:text-sky-800"}`}
                 >
@@ -190,29 +273,79 @@ export function RegisterPaymentPage() {
                 </button>
               ))}
             </div>
+            {completed && (
+              <div className="mb-4">
+                <p
+                  role="status"
+                  className="rounded-xl bg-emerald-50 p-3 text-emerald-800"
+                >
+                  {t("payments.success")}
+                </p>
+                <button
+                  type="button"
+                  className="secondary-button mt-3"
+                  onClick={() => setShowReceipt(true)}
+                >
+                  {t("receipts.view")}
+                </button>
+              </div>
+            )}
+            {refreshError && (
+              <div
+                role="alert"
+                className="mb-4 rounded-xl bg-amber-50 p-3 text-amber-800"
+              >
+                <p>{refreshError}</p>
+                <button
+                  type="button"
+                  className="primary-button mt-2"
+                  onClick={() => void refreshBalances()}
+                >
+                  {t("dashboard.retry")}
+                </button>
+              </div>
+            )}
+            {pendingEvidence && (
+              <div className="mb-4 rounded-xl bg-amber-50 p-3 text-amber-800">
+                <p role={uploadingEvidence ? "status" : "alert"}>
+                  {t(
+                    uploadingEvidence
+                      ? "payments.evidenceUploading"
+                      : "payments.evidenceUploadFailed",
+                  )}
+                </p>
+                {!uploadingEvidence && (
+                  <button
+                    type="button"
+                    className="primary-button mt-2"
+                    onClick={() => void attachEvidence(pendingEvidence)}
+                  >
+                    {t("payments.retryEvidence")}
+                  </button>
+                )}
+              </div>
+            )}
             {activeTab === "register" ? (
               <RegisterPayment
                 row={data.row}
-                onCancel={() =>
-                  navigate(returnToCycle ? cyclePath : paymentsPath)
-                }
-                onSaved={setCompleted}
+                onCancel={() => navigate(returnPath)}
+                onSaved={paymentSaved}
+                onBusyChange={setRegistering}
               />
             ) : (
-              <PaymentHistory row={data.row} />
+              <PaymentHistory
+                row={data.row}
+                recentPayments={completed?.payments}
+                version={historyVersion}
+              />
             )}
           </>
         )}
-        {completed && data && completed.payments[0] && (
+        {showReceipt && completed && data && completed.payments[0] && (
           <PaymentDialog
             title={t("payments.success")}
             busy={downloading}
-            onClose={() =>
-              navigate(returnToCycle ? cyclePath : paymentsPath, {
-                state: { paymentRegistered: true },
-                replace: true,
-              })
-            }
+            onClose={() => setShowReceipt(false)}
           >
             <dl className="grid gap-4 rounded-xl bg-emerald-50 p-4 text-sm sm:grid-cols-2">
               <div>
@@ -263,7 +396,10 @@ export function RegisterPaymentPage() {
               </p>
             )}
             {completed.evidenceUploadFailed && (
-              <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+              <p
+                role="alert"
+                className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800"
+              >
                 {t("payments.evidenceUploadFailed")}
               </p>
             )}
@@ -271,12 +407,7 @@ export function RegisterPaymentPage() {
               <button
                 type="button"
                 disabled={downloading}
-                onClick={() =>
-                  navigate(returnToCycle ? cyclePath : paymentsPath, {
-                    state: { paymentRegistered: true },
-                    replace: true,
-                  })
-                }
+                onClick={() => setShowReceipt(false)}
                 className="min-h-11 w-full rounded-xl border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
               >
                 {t("admin.close")}

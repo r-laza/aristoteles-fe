@@ -44,13 +44,19 @@ npm run dev
 
 Abre `/login`, selecciona **Administrador** e ingresa con `admin` / `admin2026` después del seed. Desde `/admin` puedes crear cuentas de docentes, estudiantes o administradores.
 
-- `ADMIN` → `/admin` (gestión de usuarios).
+- `ADMIN` → `/admin` (dashboard; gestión de personas en `/admin/users`).
 - `TEACHER` → `/teacher` (módulo pendiente).
 - `STUDENT` → `/` (dashboard existente, con sus datos de demostración).
 
 La sesión se restaura con `/api/auth/me`; el botón de salida está junto al perfil en la barra superior. Todas las llamadas usan `/api/...` a través del proxy de Vite. No se guardan tokens en localStorage. Las rutas de otros roles redirigen al dashboard propio, y el backend también valida los permisos.
 
 Los textos de interfaz están en `src/locales/es.json`. Verifica los cambios con `npm run build` y `npm run lint`.
+
+### Administradores y perfil
+
+Los administradores principales y regulares mantienen las rutas autorizadas por el rol `ADMIN`. En Personas → Administradores, solo el nivel `MAIN` muestra creación y edición; el nivel `REGULAR` puede consultar la lista. Los principales seleccionan el nivel al crear o editar un administrador. Los permisos también se validan en el backend y se actualizan en la sesión cuando se modifica la propia cuenta.
+
+`/profile` permite a ambos niveles actualizar su nombre, usuario y contraseña opcional, sin controles para cambiar permisos o activar/desactivar cuentas. El usuario o la contraseña solo pueden cambiarse con la contraseña actual. Las páginas de perfil de otros roles conservan su comportamiento anterior.
 
 ## Ciclos académicos
 
@@ -61,3 +67,9 @@ Los ciclos de la primera versión guardados únicamente en localStorage no se im
 ## Gestión de pagos
 
 `/admin/payments` permite seleccionar un ciclo y consultar los saldos de sus inscripciones. Selecciona inicialmente el ciclo activo; si no existe, utiliza el siguiente ciclo de la lista ordenada. Registra pagos desde cada fila y consulta su historial con el botón correspondiente. Los resúmenes y estados se actualizan después de registrar un pago. La información persiste en PostgreSQL mediante las rutas relativas `/api/admin/payments/...`.
+
+## Dashboard administrativo
+
+`/admin` consulta `/api/admin/dashboard` y sincroniza los indicadores y gráficos con los filtros de sede, ciclo y grupo. Muestra inscripciones totales, Escolar y Preuniversitario, recaudación, deuda total y deuda vencida; gráficos de estudiantes por grupo, ingresos mensuales y distribución por Efectivo, Transferencia, Yape y Plin. Se reutilizan los gráficos existentes sin nuevas dependencias.
+
+Las categorías académicas se obtienen del ciclo, no del nombre de los grupos. Una categoría sin registros muestra un estado vacío. Los porcentajes por método usan la recaudación total; si hay pagos históricos de otros métodos, se informa el importe no representado sin inventar categorías. Las tres pestañas finales de estudiantes y su búsqueda, detalle y exportación permanecen sin cambios.

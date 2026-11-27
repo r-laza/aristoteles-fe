@@ -1,74 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { t } from "../../lib/i18n";
 import { ApiError } from "../../services/api";
 import { CycleModal } from "./CycleModal";
-import { CycleForm } from "./CycleForm";
 import {
   cycleApi,
-  getCycle,
   type AcademicCycle,
-  type CycleGroup,
 } from "./cycles";
-
-export function EditCycleModal({
-  id,
-  onClose,
-  onSaved,
-}: {
-  id: number;
-  onClose: () => void;
-  onSaved: (cycle: AcademicCycle) => void;
-}) {
-  const [data, setData] = useState<{
-    cycle: AcademicCycle;
-    groups: CycleGroup[];
-  } | null>(null);
-  const [error, setError] = useState(false);
-  const [version, setVersion] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([getCycle(String(id)), cycleApi.groups(String(id))])
-      .then(([cycle, groups]) => {
-        if (!cancelled) setData({ cycle, groups });
-      })
-      .catch(() => {
-        if (!cancelled) setError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id, version]);
-  if (data)
-    return (
-      <CycleForm
-        cycle={data.cycle}
-        initialGroups={data.groups}
-        onClose={onClose}
-        onCreated={onSaved}
-      />
-    );
-  return (
-    <CycleModal title={t("cycles.edit")} busy={false} onClose={onClose}>
-      {error ? (
-        <div role="alert">
-          <p>{t("cycleDetail.loadError")}</p>
-          <button
-            type="button"
-            className="primary-button mt-4"
-            onClick={() => {
-              setError(false);
-              setVersion((v) => v + 1);
-            }}
-          >
-            {t("dashboard.retry")}
-          </button>
-        </div>
-      ) : (
-        <p role="status">{t("cycles.loading")}</p>
-      )}
-    </CycleModal>
-  );
-}
 
 export function DeleteCycleModal({
   cycle,

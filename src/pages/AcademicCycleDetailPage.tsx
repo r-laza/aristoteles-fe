@@ -1,16 +1,6 @@
-import { CycleForm } from "../features/cycles/CycleForm";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  Plus,
-  Users,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  CreditCard,
-  Trash2,
-} from "lucide-react";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { t } from "../lib/i18n";
 import { ApiError } from "../services/api";
@@ -26,6 +16,7 @@ import {
   type CycleEnrollment,
   type ReusableGroup,
   type Pension,
+  type Branch,
 } from "../features/cycles/cycles";
 
 const amount = (value: number | string) =>
@@ -41,33 +32,48 @@ const normalize = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("es");
 
-function AddCycleGroupForm({
+function ConfigureBranchesForm({
   cycleId,
+  cycleBranches,
   assignedGroups,
+  initialBranchId,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   cycleId: string;
+  cycleBranches: Branch[];
   assignedGroups: CycleGroup[];
+  initialBranchId?: number;
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [groups, setGroups] = useState<ReusableGroup[]>([]);
   const [pensions, setPensions] = useState<Pension[]>([]);
-  const assignedIds = new Set(
-    assignedGroups.map((group) => group.reusableGroupId),
-  );
-  const availableGroups = groups.filter((group) => !assignedIds.has(group.id));
+  const [branchId, setBranchId] = useState(initialBranchId ?? 0);
+  const [selection, setSelection] = useState<Record<number, number>>({});
+  const [search, setSearch] = useState("");
   useEffect(() => {
     let cancelled = false;
-    Promise.all([cycleApi.reusableGroups(), cycleApi.reusablePensions()])
-      .then(([groups, pensions]) => {
+    Promise.all([
+      cycleApi.branches(),
+      cycleApi.reusableGroups(),
+      cycleApi.reusablePensions(),
+    ])
+      .then(([branches, groups, pensions]) => {
         if (!cancelled) {
+          const activeBranches = branches.filter(
+            (branch) =>
+              branch.isActive ||
+              cycleBranches.some((row) => row.id === branch.id),
+          );
+          setBranches(activeBranches);
           setGroups(groups);
           setPensions(pensions);
+          setBranchId((current) => current || activeBranches[0]?.id || 0);
           setError("");
         }
       })
@@ -80,16 +86,19 @@ function AddCycleGroupForm({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [cycleId]);
+  useEffect(() => {
+    setSelection(
+      Object.fromEntries(
+        assignedGroups
+          .filter((group) => group.branch.id === branchId && group.pensionId)
+          .map((group) => [group.reusableGroupId, group.pensionId!]),
+      ),
+    );
+  }, [assignedGroups, branchId]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const groupId = Number(data.get("groupId"));
-    const pensionId = Number(data.get("pensionId"));
-    if (
-      !availableGroups.some((group) => group.id === groupId) ||
-      !pensions.some((pension) => pension.id === pensionId)
-    ) {
+    if (!branchId || Object.values(selection).some((pensionId) => !pensionId)) {
       setError(t("cycleDetail.groupPensionRequired"));
       return;
     }
@@ -97,13 +106,20 @@ function AddCycleGroupForm({
     setBusy(true);
     setError("");
     try {
-      await cycleApi.addCycleGroup(cycleId, groupId, pensionId);
-      onCreated();
+      await cycleApi.configureCycleBranch(
+        cycleId,
+        branchId,
+        Object.entries(selection).map(([groupId, pensionId]) => ({
+          groupId: Number(groupId),
+          pensionId,
+        })),
+      );
+      onSaved();
     } catch (cause) {
       setError(
         t(
           cause instanceof ApiError && cause.status === 409
-            ? "cycleDetail.groupDuplicate"
+            ? "cycleDetail.configurationInUse"
             : "cycleDetail.saveError",
         ),
       );
@@ -111,69 +127,112 @@ function AddCycleGroupForm({
       setBusy(false);
     }
   }
+  const visibleGroups = groups.filter((group) =>
+    normalize(group.name).includes(normalize(search)),
+  );
   return (
-    <CycleModal title={t("cycleDetail.addGroup")} busy={busy} onClose={onClose}>
+    <CycleModal
+      title={t("cycleDetail.configureBranches")}
+      busy={busy}
+      onClose={onClose}
+    >
       {loading ? (
         <p role="status">{t("cycles.loadingCatalogs")}</p>
       ) : (
         <form onSubmit={(event) => void submit(event)} className="space-y-4">
           <fieldset disabled={busy} className="space-y-4">
             <div>
-              <label htmlFor="cycle-group" className="field-label">
-                {t("cycleDetail.groupClassroom")}
+              <label htmlFor="configure-cycle-branch" className="field-label">
+                {t("branches.branch")}
               </label>
               <select
-                id="cycle-group"
-                name="groupId"
+                id="configure-cycle-branch"
                 autoFocus
-                required
-                defaultValue=""
+                value={branchId}
+                onChange={(event) => setBranchId(Number(event.target.value))}
                 className="field"
               >
-                <option value="" disabled>
-                  {t("cycleDetail.selectGroupClassroom")}
+                <option value={0} disabled>
+                  {t("branches.select")}
                 </option>
-                {availableGroups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                    {cycleBranches.some((row) => row.id === branch.id)
+                      ? ` · ${t("cycleDetail.assigned")}`
+                      : ""}
                   </option>
                 ))}
               </select>
-              {availableGroups.length === 0 && (
-                <p className="mt-2 text-sm text-slate-500">
-                  {t("cycleDetail.noAvailableGroups")}
-                </p>
-              )}
             </div>
             <div>
-              <label htmlFor="cycle-pension" className="field-label">
-                {t("pensionCatalog.pension")}
+              <label htmlFor="configure-group-search" className="field-label">
+                {t("cycleDetail.searchGroups")}
               </label>
-              <select
-                id="cycle-pension"
-                name="pensionId"
-                required
-                defaultValue=""
+              <input
+                id="configure-group-search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t("cycleDetail.searchGroupsPlaceholder")}
                 className="field"
-              >
-                <option value="" disabled>
-                  {t("cycleDetail.selectPension")}
-                </option>
-                {pensions.map((pension) => (
-                  <option key={pension.id} value={pension.id}>
-                    {t("cycleDetail.pensionOption", {
-                      name: pension.name,
-                      amount: amount(pension.amount),
-                      day: pension.dueDay,
-                    })}
-                  </option>
-                ))}
-              </select>
-              {pensions.length === 0 && (
-                <p className="mt-2 text-sm text-slate-500">
-                  {t("cycleDetail.noAvailablePensions")}
-                </p>
-              )}
+              />
+            </div>
+            <div className="max-h-[45vh] space-y-2 overflow-y-auto pr-1">
+              {visibleGroups.map((group) => {
+                const selected = Object.hasOwn(selection, group.id);
+                return (
+                  <div
+                    key={group.id}
+                    className="grid gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(13rem,1fr)] sm:items-center"
+                  >
+                    <label className="flex items-center gap-3 font-medium text-sky-950">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(event) =>
+                          setSelection((current) => {
+                            const next = { ...current };
+                            if (event.target.checked)
+                              next[group.id] = pensions[0]?.id ?? 0;
+                            else delete next[group.id];
+                            return next;
+                          })
+                        }
+                      />
+                      {group.name}
+                    </label>
+                    {selected && (
+                      <select
+                        aria-label={t("cycleDetail.pensionForGroup", {
+                          name: group.name,
+                        })}
+                        value={selection[group.id]}
+                        onChange={(event) =>
+                          setSelection((current) => ({
+                            ...current,
+                            [group.id]: Number(event.target.value),
+                          }))
+                        }
+                        className="field"
+                        required
+                      >
+                        <option value={0} disabled>
+                          {t("cycleDetail.selectPension")}
+                        </option>
+                        {pensions.map((pension) => (
+                          <option key={pension.id} value={pension.id}>
+                            {t("cycleDetail.pensionOption", {
+                              name: pension.name,
+                              amount: amount(pension.amount),
+                              day: pension.dueDay,
+                            })}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </fieldset>
           {error && (
@@ -192,11 +251,14 @@ function AddCycleGroupForm({
             </button>
             <button
               disabled={
-                busy || availableGroups.length === 0 || pensions.length === 0
+                busy ||
+                !branchId ||
+                groups.length === 0 ||
+                pensions.length === 0
               }
               className="primary-button"
             >
-              {t(busy ? "admin.saving" : "cycleDetail.addGroup")}
+              {t(busy ? "admin.saving" : "cycleDetail.saveConfiguration")}
             </button>
           </div>
         </form>
@@ -228,31 +290,9 @@ export function AcademicCycleDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
-  const studentsSection = useRef<HTMLElement>(null);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [modal, setModal] = useState<"cycle" | "addGroup" | null>(null);
-  const [deletingGroup, setDeletingGroup] = useState<number | null>(null);
-  const [groupFilter, setGroupFilter] = useState("");
-  const filteredEnrollments =
-    data?.enrollments.filter(
-      (enrollment) =>
-        (!groupFilter || enrollment.group.id === Number(groupFilter)) &&
-        normalize(
-          `${enrollment.student.fullName} ${enrollment.student.dni}`,
-        ).includes(normalize(search.trim())),
-    ) ?? [];
-  const pageSize = 20;
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredEnrollments.length / pageSize),
-  );
-  const currentPage = Math.min(page, totalPages);
-  const pageStart = (currentPage - 1) * pageSize;
-  const visibleEnrollments = filteredEnrollments.slice(
-    pageStart,
-    pageStart + pageSize,
-  );
+  const [modal, setModal] = useState<"cycle" | "configure" | null>(null);
+  const [actionBranchId, setActionBranchId] = useState<number | null>(null);
+  const [deletingBranch, setDeletingBranch] = useState<number | null>(null);
   const [success, setSuccess] = useState(() =>
     createdFromNavigation ? t("cycles.success") : "",
   );
@@ -272,9 +312,6 @@ export function AcademicCycleDetailPage() {
       .then(([cycle, groups, enrollments]) => {
         if (!cancelled) {
           setData({ cycle, groups, enrollments });
-          setGroupFilter((current) =>
-            groups.some((group) => String(group.id) === current) ? current : "",
-          );
           setError("");
         }
       })
@@ -297,47 +334,36 @@ export function AcademicCycleDetailPage() {
   }, [createdCycle, id, version]);
   function refresh(message: string) {
     setModal(null);
-    setPage(1);
     setSuccess(t(message));
     setActionError("");
     setLoading(true);
     setVersion((value) => value + 1);
   }
-  async function deleteGroup(group: CycleGroup) {
+  async function deleteBranch(branch: Branch) {
     if (
-      group._count.enrollments ||
-      !window.confirm(t("cycleDetail.confirmDeleteGroup", { name: group.name }))
+      !window.confirm(
+        t("cycleDetail.confirmRemoveBranch", { name: branch.name }),
+      )
     )
       return;
-    setDeletingGroup(group.id);
+    setDeletingBranch(branch.id);
     setSuccess("");
     setActionError("");
     try {
-      await cycleApi.deleteCycleGroup(id, group.id);
-      setGroupFilter((value) => (value === String(group.id) ? "" : value));
-      refresh("cycleDetail.groupDeleted");
+      await cycleApi.deleteCycleBranch(id, branch.id);
+      refresh("cycleDetail.branchRemoved");
     } catch (cause) {
       setActionError(
         t(
           cause instanceof ApiError && cause.status === 409
-            ? "cycleDetail.groupInUse"
-            : "cycleDetail.groupDeleteError",
+            ? "cycleDetail.branchInUse"
+            : "cycleDetail.branchRemoveError",
         ),
       );
     } finally {
-      setDeletingGroup(null);
+      setDeletingBranch(null);
     }
   }
-  const labels = [
-    "admin.name",
-    "cycleDetail.group",
-    "cycleDetail.fee",
-    "cycleDetail.assignedAmount",
-    "cycleDetail.discountApplied",
-    "cycleDetail.total",
-    "admin.status",
-    "admin.actions",
-  ];
   return (
     <AppLayout>
       <div className="py-5">
@@ -392,12 +418,12 @@ export function AcademicCycleDetailPage() {
                 <span className="rounded-full bg-cyan-50 px-3 py-1 text-sm font-semibold text-sky-800">
                   {t(`cycles.${cycleStatus(data.cycle, today)}`)}
                 </span>
-                <button
+                <Link
+                  to={`/admin/cycles/${id}/edit`}
                   className="primary-button sm:ml-auto"
-                  onClick={() => setModal("cycle")}
                 >
                   {t("cycles.edit")}
-                </button>
+                </Link>
               </div>
               <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-3 xl:grid-cols-6">
                 {[
@@ -447,368 +473,144 @@ export function AcademicCycleDetailPage() {
               </dl>
             </section>
             <section
-              aria-labelledby="cycle-groups-title"
               className="mb-6 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6"
+              aria-labelledby="cycle-hierarchy-title"
             >
               <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
                 <h2
-                  id="cycle-groups-title"
+                  id="cycle-hierarchy-title"
                   className="text-xl font-semibold text-sky-950"
                 >
-                  {t("cycleDetail.groupsClassrooms")}
+                  {t("branches.hierarchyTitle")}
                 </h2>
                 <button
                   className="primary-button"
                   onClick={() => {
-                    setSuccess("");
-                    setModal("addGroup");
+                    setActionBranchId(null);
+                    setModal("configure");
                   }}
                 >
-                  <Plus size={18} aria-hidden="true" />
-                  {t("cycleDetail.addGroup")}
+                  <Plus size={18} />
+                  {t("cycleDetail.configureBranches")}
                 </button>
               </div>
-              {data.groups.length === 0 ? (
-                <p className="py-6 text-center text-slate-500">
-                  {t("cycleDetail.noGroups")}
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGroupFilter("");
-                      setPage(1);
-                    }}
-                    className={`rounded-xl border px-4 py-3 text-sm font-medium ${!groupFilter ? "border-cyan-600 bg-cyan-50 text-cyan-800" : "border-slate-200 text-slate-700 hover:bg-slate-50"}`}
-                  >
-                    {t("cycleDetail.allGroups")}
-                  </button>
-                  {data.groups.map((group) => (
-                    <div
-                      key={group.id}
-                      className={`flex min-w-64 flex-1 items-start rounded-xl border sm:max-w-sm ${groupFilter === String(group.id) ? "border-cyan-600 bg-cyan-50" : "border-slate-200 bg-white"}`}
+              <div className="space-y-4">
+                {data.cycle.branches.map(({ branch }) => {
+                  const branchGroups = data.groups.filter(
+                    (group) => group.branch.id === branch.id,
+                  );
+                  return (
+                    <article
+                      key={branch.id}
+                      className="rounded-2xl border border-slate-200 p-4 sm:p-5"
                     >
-                      <button
-                        type="button"
-                        className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left text-sm text-sky-950"
-                        onClick={() => {
-                          setGroupFilter(String(group.id));
-                          setSearch("");
-                          setPage(1);
-                          studentsSection.current?.scrollIntoView({
-                            behavior: "smooth",
-                            block: "start",
-                          });
-                        }}
-                      >
-                        <Users
-                          size={17}
-                          className="shrink-0 text-cyan-600"
-                          aria-hidden="true"
-                        />
-                        <span className="min-w-0 space-y-1">
-                          <strong className="block break-words">
-                            {group.name}
-                          </strong>
-                          <span className="block text-xs text-slate-500">
-                            {t(
-                              group._count.enrollments === 1
-                                ? "cycleDetail.oneStudent"
-                                : "cycleDetail.studentCount",
-                              { count: group._count.enrollments },
-                            )}
-                          </span>
-                          <span className="block text-xs">
-                            <span className="text-slate-500">
-                              {t("pensionCatalog.pension")}:{" "}
-                            </span>
-                            {group.pension
-                              ? t("pensionCatalog.monthlyLabel", {
-                                  name: group.pension.name,
-                                  amount: amount(group.pension.amount),
-                                })
-                              : t("pensionCatalog.unassigned")}
-                          </span>
-                          {group.pension && (
-                            <span className="block text-xs">
-                              <span className="text-slate-500">
-                                {t("pensionCatalog.dueDay")}:{" "}
-                              </span>
-                              {group.pension.dueDay}
-                            </span>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-sky-950">
+                            {branch.name}
+                          </h3>
+                          {branch.address && (
+                            <p className="text-sm text-slate-500">
+                              {branch.address}
+                            </p>
                           )}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        disabled={
-                          Boolean(group._count.enrollments) ||
-                          deletingGroup === group.id
-                        }
-                        onClick={() => void deleteGroup(group)}
-                        aria-label={t("cycleDetail.deleteGroupNamed", {
-                          name: group.name,
-                        })}
-                        title={
-                          group._count.enrollments
-                            ? t("cycleDetail.groupInUse")
-                            : t("cycleDetail.deleteGroup")
-                        }
-                        className="mr-1 inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-slate-300"
-                      >
-                        <Trash2 size={17} aria-hidden="true" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {data.groups.some((group) => group._count.enrollments > 0) && (
-                <p className="mt-3 text-sm text-slate-500">
-                  {t("cycleDetail.groupInUse")}
-                </p>
-              )}
-            </section>
-            <section
-              ref={studentsSection}
-              tabIndex={-1}
-              aria-labelledby="cycle-students-title"
-              className="scroll-mt-6 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6"
-            >
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <h2
-                  id="cycle-students-title"
-                  className="text-xl font-semibold text-sky-950"
-                >
-                  {t("cycleDetail.studentsEnrollments")}
-                </h2>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Link
-                    to={`/admin/payments?cycleId=${id}`}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-200 px-4 py-2.5 text-sm font-semibold text-sky-800 transition hover:bg-sky-50 hover:text-sky-950"
-                  >
-                    <CreditCard size={18} aria-hidden="true" />
-                    {t("cycleDetail.managePayments")}
-                  </Link>
-                  <Link
-                    to={`/admin/cycles/${id}/enrollments`}
-                    className="primary-button"
-                  >
-                    <Plus size={18} aria-hidden="true" />
-                    {t("enrollmentPage.addStudents")}
-                  </Link>
-                </div>
-              </div>
-              <div className="mb-4 grid items-end gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="cycle-student-search" className="field-label">
-                    {t("cycleDetail.searchStudents")}
-                  </label>
-                  <div className="relative">
-                    <Search
-                      size={18}
-                      aria-hidden="true"
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
-                    <input
-                      id="cycle-student-search"
-                      type="search"
-                      className="field pl-10"
-                      placeholder={t("cycleDetail.searchStudentsPlaceholder")}
-                      value={search}
-                      onChange={(event) => {
-                        setSearch(event.target.value);
-                        setPage(1);
-                      }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="student-group-filter" className="field-label">
-                    {t("cycleDetail.group")}
-                  </label>
-                  <select
-                    id="student-group-filter"
-                    value={groupFilter}
-                    onChange={(event) => {
-                      setGroupFilter(event.target.value);
-                      setPage(1);
-                    }}
-                    className="field"
-                  >
-                    <option value="">{t("cycleDetail.allGroups")}</option>
-                    {data.groups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              {data.groups.length === 0 && (
-                <p className="mb-4 rounded-xl bg-sky-50 p-3 text-sm text-sky-800">
-                  {t("cycleDetail.needGroup")}
-                </p>
-              )}
-              {filteredEnrollments.length === 0 ? (
-                <p className="py-6 text-center text-slate-500">
-                  {t(
-                    data.enrollments.length
-                      ? "cycleDetail.noMatchingStudents"
-                      : "cycleDetail.noEnrollments",
-                  )}
-                </p>
-              ) : (
-                <>
-                  <div className="hidden xl:block">
-                    <table className="w-full table-fixed text-left text-sm">
-                      <thead>
-                        <tr>
-                          {labels.map((label) => (
-                            <th
-                              key={label}
-                              scope="col"
-                              className="border-b px-2 py-3 font-medium text-slate-500"
-                            >
-                              {t(label)}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {visibleEnrollments.map((enrollment) => (
-                          <tr
-                            key={enrollment.id}
-                            className="border-b border-slate-100 last:border-0"
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            to={`/admin/cycles/${id}/enrollments?branchId=${branch.id}`}
+                            className="rounded-xl border border-sky-200 px-3 py-2 text-sm font-semibold text-sky-800"
                           >
-                            {[
-                              enrollment.student.fullName,
-                              enrollment.group.name,
-                              enrollment.fee.name,
-                              amount(enrollment.baseAmount),
-                              amount(enrollment.discountAmount),
-                              amount(enrollment.finalAmount),
-                              t("cycleDetail.ACTIVE"),
-                            ].map((value, i) => (
-                              <td
-                                key={labels[i]}
-                                className="break-words px-2 py-4"
+                            {t("cycleDetail.enroll")}
+                          </Link>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            onClick={() => {
+                              setActionBranchId(branch.id);
+                              setModal("configure");
+                            }}
+                          >
+                            {t("cycleDetail.editConfiguration")}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deletingBranch === branch.id}
+                            className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
+                            onClick={() => void deleteBranch(branch)}
+                          >
+                            <Trash2 size={16} />
+                            {t("cycleDetail.removeBranch")}
+                          </button>
+                        </div>
+                      </div>
+                      {branchGroups.length ? (
+                        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                          {branchGroups.map((group) => {
+                            const enrolled = data.enrollments.filter(
+                              (enrollment) => enrollment.group.id === group.id,
+                            );
+                            return (
+                              <section
+                                key={group.id}
+                                className="rounded-xl bg-slate-50 p-4"
                               >
-                                {value}
-                              </td>
-                            ))}
-                            <td className="px-2 py-4 text-right">
-                              <Link
-                                to={`/admin/payments/${enrollment.id}/manage?cycleId=${id}&returnTo=cycle`}
-                                className="inline-flex rounded-lg bg-sky-950 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-800"
-                              >
-                                {t("payments.register")}
-                              </Link>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <ul className="space-y-4 xl:hidden">
-                    {visibleEnrollments.map((enrollment) => (
-                      <li
-                        key={enrollment.id}
-                        className="rounded-xl border border-slate-100 p-4"
-                      >
-                        <h2 className="break-words font-semibold text-sky-950">
-                          {enrollment.student.fullName}
-                        </h2>
-                        <dl className="mt-3 space-y-2">
-                          {[
-                            enrollment.group.name,
-                            enrollment.fee.name,
-                            amount(enrollment.baseAmount),
-                            amount(enrollment.discountAmount),
-                            amount(enrollment.finalAmount),
-                            t("cycleDetail.ACTIVE"),
-                          ].map((value, i) => (
-                            <div
-                              key={labels[i + 1]}
-                              className="flex justify-between gap-4 text-sm"
-                            >
-                              <dt className="text-slate-500">
-                                {t(labels[i + 1])}
-                              </dt>
-                              <dd className="min-w-0 break-words text-right">
-                                {value}
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                        <Link
-                          to={`/admin/payments/${enrollment.id}/manage?cycleId=${id}&returnTo=cycle`}
-                          className="primary-button mt-4 w-full"
-                        >
-                          {t("payments.register")}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4">
-                <p role="status" className="text-sm text-slate-500">
-                  {t("cycleDetail.studentRange", {
-                    from: filteredEnrollments.length ? pageStart + 1 : 0,
-                    to: Math.min(
-                      pageStart + pageSize,
-                      filteredEnrollments.length,
-                    ),
-                    total: filteredEnrollments.length,
-                  })}
-                </p>
-                <nav
-                  aria-label={t("cycleDetail.pagination")}
-                  className="flex items-center gap-3"
-                >
-                  <button
-                    type="button"
-                    disabled={currentPage === 1}
-                    onClick={() => setPage(currentPage - 1)}
-                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <ChevronLeft size={16} aria-hidden="true" />
-                    {t("cycleDetail.previousPage")}
-                  </button>
-                  <span className="text-sm text-slate-500">
-                    {t("cycleDetail.pageOf", {
-                      page: currentPage,
-                      total: totalPages,
-                    })}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setPage(currentPage + 1)}
-                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {t("cycleDetail.nextPage")}
-                    <ChevronRight size={16} aria-hidden="true" />
-                  </button>
-                </nav>
+                                <div>
+                                  <h4 className="font-semibold text-sky-950">
+                                    {group.name}
+                                  </h4>
+                                  <p className="mt-1 text-sm text-slate-600">
+                                    {group.pension
+                                      ? t("pensionCatalog.monthlyLabel", {
+                                          name: group.pension.name,
+                                          amount: amount(group.pension.amount),
+                                        })
+                                      : t("pensionCatalog.unassigned")}
+                                  </p>
+                                  {group.pension && (
+                                    <p className="text-xs text-slate-500">
+                                      {t("pensionCatalog.dueDay")}:{" "}
+                                      {group.pension.dueDay}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="mt-3 border-t border-slate-200 pt-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    {t("cycleDetail.studentCount", {
+                                      count: enrolled.length,
+                                    })}
+                                  </p>
+                                  {enrolled.length > 0 && (
+                                    <ul className="mt-2 space-y-1 text-sm">
+                                      {enrolled.map((enrollment) => (
+                                        <li key={enrollment.id}>
+                                          {enrollment.student.fullName}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              </section>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+                          {t("cycleDetail.noGroups")}
+                        </p>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             </section>
-            {modal === "cycle" && (
-              <CycleForm
-                cycle={data.cycle}
-                initialGroups={data.groups}
-                detailsOnly
-                onClose={() => setModal(null)}
-                onCreated={() => refresh("cycles.updated")}
-              />
-            )}
-            {modal === "addGroup" && (
-              <AddCycleGroupForm
+            {modal === "configure" && (
+              <ConfigureBranchesForm
                 cycleId={id}
+                cycleBranches={data.cycle.branches.map(({ branch }) => branch)}
                 assignedGroups={data.groups}
+                initialBranchId={actionBranchId ?? undefined}
                 onClose={() => setModal(null)}
-                onCreated={() => refresh("cycleDetail.groupAdded")}
+                onSaved={() => refresh("cycleDetail.configurationSaved")}
               />
             )}
           </>

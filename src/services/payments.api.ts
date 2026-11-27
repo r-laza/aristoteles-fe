@@ -32,6 +32,7 @@ export type PaymentRow = {
     primaryPhone: string | null;
   };
   group: { id: number; name: string };
+  branch: { id: number; name: string };
   baseAmount: string;
   discountAmount: string;
   amountDue: string;

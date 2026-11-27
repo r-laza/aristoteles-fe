@@ -38,6 +38,7 @@ const row = {
   id: 1,
   status: "OVERDUE",
   student: { fullName: "María Pérez" },
+  branch: { id: 4 },
   group: { id: 2 },
   obligations: [enrollment, january, february],
 };
@@ -117,6 +118,21 @@ test("search ignores accents and composes with group filters", () => {
     filterPaymentRows([row], { ...emptyFilters, search: "maria", group: "3" })
       .length,
     0,
+  );
+});
+
+test("branch scope excludes groups and students from other branches", () => {
+  const otherBranch = {
+    ...row,
+    id: 2,
+    branch: { id: 5 },
+    group: { id: 3 },
+  };
+  assert.deepEqual(
+    filterPaymentRows([row, otherBranch], { ...emptyFilters, branch: "4" }).map(
+      (item) => item.id,
+    ),
+    [1],
   );
 });
 

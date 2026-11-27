@@ -28,6 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = {
     user,
     loading,
+    refresh: async () => {
+      setUser(await authApi.me());
+    },
     login: async (input: import("./types").Credentials) => {
       setUser(await authApi.login(input));
     },

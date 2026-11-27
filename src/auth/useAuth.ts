@@ -5,6 +5,7 @@ type AuthState = {
   loading: boolean;
   login: (input: Credentials) => Promise<void>;
   logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 };
 export const AuthContext = createContext<AuthState | null>(null);
 export function useAuth() {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Eye, FilePlus2, Paperclip } from "lucide-react";
 import { t } from "../../lib/i18n";
 import { formatCycleDate } from "../cycles/cycles";
@@ -10,20 +10,42 @@ import {
 import { money, periodLabel } from "./formatting";
 import { ReceiptDialog } from "./ReceiptDialog";
 import { downloadReceiptPdf, viewReceiptPdf } from "./receiptPdf";
+import { newestPaymentsFirst, PAYMENT_HIGHLIGHT_MS } from "./paymentFeedback";
 
-export function PaymentHistory({ row }: { row: PaymentRow }) {
+export function PaymentHistory({
+  row,
+  recentPayments,
+  version = 0,
+}: {
+  row: PaymentRow;
+  recentPayments?: Payment[];
+  version?: number;
+}) {
   const [payments, setPayments] = useState<Payment[] | null>(null);
   const [error, setError] = useState(false);
+  const [retryVersion, setRetryVersion] = useState(0);
   const [receiptPayment, setReceiptPayment] = useState<Payment | null>(null);
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [highlightedIds, setHighlightedIds] = useState<number[]>([]);
+  const highlightedRegistration = useRef<Payment[] | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
     paymentsApi
       .history(row.id)
       .then((result) => {
-        if (!cancelled) setPayments(result);
+        if (!cancelled) {
+          setError(false);
+          setPayments(newestPaymentsFirst(result));
+          if (
+            recentPayments &&
+            highlightedRegistration.current !== recentPayments
+          ) {
+            highlightedRegistration.current = recentPayments;
+            setHighlightedIds(recentPayments.map((payment) => payment.id));
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setError(true);
@@ -31,7 +53,16 @@ export function PaymentHistory({ row }: { row: PaymentRow }) {
     return () => {
       cancelled = true;
     };
-  }, [row.id]);
+  }, [row.id, version, recentPayments, retryVersion]);
+
+  useEffect(() => {
+    if (highlightedIds.length === 0) return;
+    const timer = window.setTimeout(
+      () => setHighlightedIds([]),
+      PAYMENT_HIGHLIGHT_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [highlightedIds]);
 
   async function handleReceipt(payment: Payment, mode: "view" | "download") {
     setBusyId(payment.id);
@@ -47,7 +78,19 @@ export function PaymentHistory({ row }: { row: PaymentRow }) {
     }
   }
 
-  if (error) return <p role="alert">{t("payments.historyLoadError")}</p>;
+  if (error)
+    return (
+      <div role="alert">
+        <p>{t("payments.historyLoadError")}</p>
+        <button
+          type="button"
+          className="primary-button mt-2"
+          onClick={() => setRetryVersion((value) => value + 1)}
+        >
+          {t("dashboard.retry")}
+        </button>
+      </div>
+    );
   if (!payments) return <p role="status">{t("payments.loading")}</p>;
   if (payments.length === 0)
     return (
@@ -84,7 +127,14 @@ export function PaymentHistory({ row }: { row: PaymentRow }) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {payments.map((payment) => (
-                <tr key={payment.id}>
+                <tr
+                  key={payment.id}
+                  className={
+                    highlightedIds.includes(payment.id)
+                      ? "payment-new-highlight"
+                      : undefined
+                  }
+                >
                   <td className="whitespace-nowrap px-4 py-3">
                     {formatCycleDate(payment.paymentDate.slice(0, 10))}
                   </td>

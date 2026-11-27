@@ -8,5 +8,5 @@ test("module and pension obligations use independent checkboxes", async () => {
   assert.doesNotMatch(source, /type=\{[\s\S]*?"radio"/);
   assert.match(source, /selected\.includes\(key\)[\s\S]*?selected\.filter[\s\S]*?\.\.\.selected, key/);
   assert.match(source, /obligations: selectedCharges\.map/);
-  assert.match(source, /for \(const \[index, payment\] of registration\.payments\.entries\(\)\)/);
+  assert.match(source, /onSaved\(\s*registration,/);
 });

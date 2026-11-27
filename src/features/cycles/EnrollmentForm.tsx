@@ -84,7 +84,7 @@ export function EnrollmentForm({
       await cycleApi.enroll(id, {
         studentId: Number(data.get("studentId")),
         groupId: Number(groupId),
-        branchId: groups.find((group) => group.id === Number(groupId))!.reusableGroup.branchId,
+        branchId: groups.find((group) => group.id === Number(groupId))!.branch.id,
         discountPercent: enrollmentDiscountPercent || "0",
         pensionDiscountPercent: pensionDiscountPercent || "0",
         discountReason: String(data.get("discountReason")).trim(),

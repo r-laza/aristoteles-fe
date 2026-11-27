@@ -57,3 +57,18 @@ textarea {
   .field-label { @apply mb-2 block text-sm font-medium text-slate-700; }
   .primary-button { @apply inline-flex items-center justify-center gap-2 rounded-xl bg-sky-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-wait disabled:opacity-60; }
 }
+
+@keyframes payment-highlight {
+  from { background-color: #d1fae5; }
+  to { background-color: transparent; }
+}
+
+.payment-new-highlight {
+  animation: payment-highlight 5s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .payment-new-highlight {
+    animation-timing-function: steps(1, end);
+  }
+}

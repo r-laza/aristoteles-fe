@@ -7,6 +7,7 @@ import type {
 
 export type PaymentFiltersValue = {
   search: string;
+  branch: string;
   group: string;
   type: string;
   status: string;
@@ -14,6 +15,7 @@ export type PaymentFiltersValue = {
 };
 export const emptyFilters: PaymentFiltersValue = {
   search: "",
+  branch: "",
   group: "",
   type: "",
   status: "",
@@ -59,6 +61,7 @@ export function filterPaymentRows(
     const charges = scopedCharges(row, filters);
     return (
       normalize(row.student.fullName).includes(normalize(filters.search)) &&
+      (!filters.branch || String(row.branch.id) === filters.branch) &&
       (!filters.group || String(row.group.id) === filters.group) &&
       (charges.length > 0 || (!filters.type && !filters.month)) &&
       (!filters.status ||

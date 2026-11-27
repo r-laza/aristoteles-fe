@@ -3,11 +3,13 @@ import { periodLabel } from "./formatting";
 import type { PaymentFiltersValue } from "./paymentView";
 export function PaymentFilters({
   filters,
+  branches,
   groups,
   months,
   onChange,
 }: {
   filters: PaymentFiltersValue;
+  branches: { id: number; name: string }[];
   groups: { id: number; name: string }[];
   months: string[];
   onChange: (value: PaymentFiltersValue) => void;
@@ -27,6 +29,26 @@ export function PaymentFilters({
             onChange({ ...filters, search: event.target.value })
           }
         />
+      </div>
+      <div>
+        <label htmlFor="payments-branch" className="field-label">
+          {t("cycles.branch")}
+        </label>
+        <select
+          id="payments-branch"
+          className="field !py-2.5 text-sm"
+          value={filters.branch}
+          onChange={(event) =>
+            onChange({ ...filters, branch: event.target.value, group: "" })
+          }
+        >
+          <option value="">{t("payments.all")}</option>
+          {branches.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
       </div>
       <div>
         <label htmlFor="payments-group" className="field-label">

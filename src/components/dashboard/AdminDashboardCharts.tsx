@@ -6,6 +6,57 @@ type Monthly = DashboardSummary["monthlyCollected"][number];
 
 const amount = (value: string) => Math.round(Number(value) * 100);
 
+export function EnrollmentGroupChart({
+  data,
+  color = "#0369a1",
+}: {
+  data: DashboardSummary["enrollmentDistribution"]["school"];
+  color?: string;
+}) {
+  const maximum = Math.max(0, ...data.map((group) => group.count));
+  if (maximum === 0) return <ChartEmpty />;
+  return (
+    <ul className="space-y-5">
+      {data.map((group) => {
+        const tooltip = t("adminDashboard.groupEnrollmentTooltip", {
+          group: group.name,
+          count: group.count,
+        });
+        return (
+          <li
+            key={group.id}
+            tabIndex={0}
+            title={tooltip}
+            aria-label={tooltip}
+            className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+          >
+            <div className="mb-2 flex items-start justify-between gap-4 text-sm">
+              <span className="min-w-0 break-words font-medium text-slate-600">
+                {group.name}
+              </span>
+              <strong className="shrink-0 tabular-nums text-sky-950">
+                {group.count}
+              </strong>
+            </div>
+            <div
+              className="h-3 overflow-hidden rounded-full bg-slate-100"
+              aria-hidden="true"
+            >
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${(group.count / maximum) * 100}%`,
+                  backgroundColor: color,
+                }}
+              />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function MonthlyRevenueChart({ data }: { data: Monthly[] }) {
   const maximum = Math.max(0, ...data.map((row) => amount(row.total)));
   if (maximum === 0) return <ChartEmpty />;
@@ -85,16 +136,35 @@ export function DonutChart({
   items,
   centerLabel,
   centerValue,
+  percentageTotal,
 }: {
   items: DonutItem[];
   centerLabel: string;
   centerValue: string;
+  percentageTotal?: number;
 }) {
   const total = items.reduce((sum, item) => sum + item.value, 0);
   if (total === 0) return <ChartEmpty />;
+  const denominator = percentageTotal ?? total;
+  const percent = (value: number) =>
+    new Intl.NumberFormat("es-PE", {
+      style: "percent",
+      maximumFractionDigits: 1,
+    }).format(value / denominator);
+  const tooltip = (item: DonutItem) =>
+    t(
+      percentageTotal === undefined
+        ? "adminDashboard.segmentTooltip"
+        : "adminDashboard.methodTooltip",
+      {
+        label: item.label,
+        value: item.displayValue ?? item.value,
+        percentage: percent(item.value),
+      },
+    );
   const segments = items.reduce<{ cursor: number; values: string[] }>(
     (result, item) => {
-      const end = result.cursor + (item.value / total) * 100;
+      const end = result.cursor + (item.value / denominator) * 100;
       return {
         cursor: end,
         values: [...result.values, `${item.color} ${result.cursor}% ${end}%`],
@@ -102,23 +172,26 @@ export function DonutChart({
     },
     { cursor: 0, values: [] },
   ).values;
+  if (percentageTotal !== undefined && total < percentageTotal)
+    segments.push(`#e2e8f0 ${(total / percentageTotal) * 100}% 100%`);
   return (
     <div className="grid items-center gap-6 sm:grid-cols-[160px_minmax(0,1fr)]">
       <div
         className="relative mx-auto h-40 w-40 rounded-full"
         style={{ background: `conic-gradient(${segments.join(", ")})` }}
         role="img"
-        aria-label={items
-          .map((item) =>
-            t("adminDashboard.segmentTooltip", {
-              label: item.label,
-              value: item.displayValue ?? item.value,
-            }),
-          )
-          .join(", ")}
+        aria-label={items.map(tooltip).join(", ")}
       >
         <div className="absolute inset-7 grid place-content-center rounded-full bg-white text-center">
-          <strong className="text-xl text-sky-950">{centerValue}</strong>
+          <strong
+            className={
+              percentageTotal === undefined
+                ? "text-xl text-sky-950"
+                : "break-words px-1 text-sm text-sky-950"
+            }
+          >
+            {centerValue}
+          </strong>
           <span className="text-xs text-slate-500">{centerLabel}</span>
         </div>
       </div>
@@ -127,10 +200,11 @@ export function DonutChart({
           <li
             key={item.label}
             className="flex items-center justify-between gap-3 text-sm"
-            title={t("adminDashboard.segmentTooltip", {
-              label: item.label,
-              value: item.displayValue ?? item.value,
-            })}
+            title={tooltip(item)}
+            tabIndex={percentageTotal === undefined ? undefined : 0}
+            aria-label={
+              percentageTotal === undefined ? undefined : tooltip(item)
+            }
           >
             <span className="flex min-w-0 items-center gap-2 text-slate-600">
               <span
@@ -139,9 +213,16 @@ export function DonutChart({
               />
               <span className="truncate">{item.label}</span>
             </span>
-            <strong className="text-slate-800">
-              {item.displayValue ?? item.value}
-            </strong>
+            <span className="shrink-0 text-right">
+              <strong className="text-slate-800">
+                {item.displayValue ?? item.value}
+              </strong>
+              {percentageTotal !== undefined && (
+                <span className="mt-0.5 block text-xs tabular-nums text-slate-500">
+                  {percent(item.value)}
+                </span>
+              )}
+            </span>
           </li>
         ))}
       </ul>

@@ -18,7 +18,12 @@ import {
 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { PasswordInput } from "../auth/PasswordInput";
-import type { Person } from "../auth/types";
+import {
+  canManageAdministrators,
+  type AdminLevel,
+  type Person,
+} from "../auth/types";
+import { useAuth } from "../auth/useAuth";
 import { peopleApi, type CreatePersonInput } from "../services/auth.api";
 import { ApiError } from "../services/api";
 import { t } from "../lib/i18n";
@@ -114,8 +119,7 @@ function fieldErrorText(reason?: string) {
   if (!reason) return "";
   if (reason === "required") return t("admin.validation.required");
   if (reason === "tooLong") return t("admin.validation.tooLong");
-  if (reason === "documentFormat")
-    return t("admin.validation.documentFormat");
+  if (reason === "documentFormat") return t("admin.validation.documentFormat");
   if (reason === "duplicateDni") return t("admin.validation.duplicateDni");
   if (reason === "duplicateUsername")
     return t("admin.validation.duplicateUsername");
@@ -422,7 +426,10 @@ export function StudentForm({
               </option>
             ))}
           </select>
-          <FieldError id="relationship-error" error={fieldErrors.relationship} />
+          <FieldError
+            id="relationship-error"
+            error={fieldErrors.relationship}
+          />
         </div>
         {relationship === "OTHER" && (
           <Field
@@ -481,7 +488,10 @@ export function StudentForm({
                   >
                     <PasswordInput id="password" newPassword />
                   </div>
-                  <FieldError id="password-error" error={fieldErrors.password} />
+                  <FieldError
+                    id="password-error"
+                    error={fieldErrors.password}
+                  />
                 </div>
               </div>
             )}
@@ -508,6 +518,9 @@ function StaffForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<PersonFieldErrors>({});
+  const [adminLevel, setAdminLevel] = useState<AdminLevel>(
+    person?.adminLevel ?? "REGULAR",
+  );
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -517,6 +530,7 @@ function StaffForm({
       username: String(data.get("username")).trim(),
       password: String(data.get("password") ?? ""),
       isActive: data.get("isActive") === "true",
+      ...(role === "ADMIN" ? { adminLevel } : {}),
     };
     const validation = validateStaffForm(
       {
@@ -545,10 +559,19 @@ function StaffForm({
       if (cause instanceof ApiError && cause.field) {
         setFieldErrors({
           [cause.field]:
-            cause.status === 409 ? "duplicateUsername" : (cause.reason ?? "format"),
+            cause.status === 409
+              ? "duplicateUsername"
+              : (cause.reason ?? "format"),
         });
         setError(t("admin.validation.review"));
-      } else
+      } else if (
+        cause instanceof ApiError &&
+        cause.code === "LAST_MAIN_ADMINISTRATOR"
+      )
+        setError(t("admin.lastMainAdministrator"));
+      else if (cause instanceof ApiError && cause.status === 403)
+        setError(t("admin.managementForbidden"));
+      else
         setError(
           t(
             cause instanceof ApiError && cause.status === 409
@@ -561,7 +584,11 @@ function StaffForm({
     }
   }
   return (
-    <form noValidate onSubmit={(event) => void submit(event)} className="space-y-4">
+    <form
+      noValidate
+      onSubmit={(event) => void submit(event)}
+      className="space-y-4"
+    >
       <fieldset disabled={busy} className="space-y-4">
         <Field
           label={t("admin.fullName")}
@@ -590,13 +617,36 @@ function StaffForm({
               className={`field ${fieldErrors.password ? "border-red-500" : ""}`}
             />
           ) : (
-            <div className={fieldErrors.password ? "rounded-xl ring-1 ring-red-500" : ""}>
+            <div
+              className={
+                fieldErrors.password ? "rounded-xl ring-1 ring-red-500" : ""
+              }
+            >
               <PasswordInput id="password" newPassword />
             </div>
           )}
           <FieldError id="password-error" error={fieldErrors.password} />
         </div>
         <StatusField defaultValue={person?.isActive} />
+        {role === "ADMIN" && (
+          <label className="block">
+            <span className="field-label">{t("admin.permissionLevel")}</span>
+            <select
+              className="field"
+              value={adminLevel}
+              onChange={(event) => {
+                if (
+                  event.target.value === "MAIN" ||
+                  event.target.value === "REGULAR"
+                )
+                  setAdminLevel(event.target.value);
+              }}
+            >
+              <option value="REGULAR">{t("admin.levels.REGULAR")}</option>
+              <option value="MAIN">{t("admin.levels.MAIN")}</option>
+            </select>
+          </label>
+        )}
       </fieldset>
       <ErrorMessage error={error} />
       <FormActions busy={busy} onClose={onClose} editing={Boolean(person)} />
@@ -975,7 +1025,7 @@ function StaffTable({
   onEdit,
 }: {
   people: Person[];
-  onEdit: (p: Person) => void;
+  onEdit?: (p: Person) => void;
 }) {
   return (
     <>
@@ -1012,7 +1062,14 @@ function StaffTable({
                 key={person.id}
                 className="border-b border-slate-100 last:border-0"
               >
-                <td className="px-2 py-4 font-medium">{person.fullName}</td>
+                <td className="px-2 py-4 font-medium">
+                  {person.fullName}
+                  {person.role === "ADMIN" && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {t(`admin.levels.${person.adminLevel ?? "REGULAR"}`)}
+                    </p>
+                  )}
+                </td>
                 <td className="px-2 py-4">{person.username}</td>
                 <td className="px-2 py-4">
                   {t(person.isActive ? "admin.active" : "admin.inactive")}
@@ -1021,11 +1078,13 @@ function StaffTable({
                   {new Date(person.createdAt).toLocaleDateString("es-EC")}
                 </td>
                 <td className="px-2 py-4 text-right">
-                  <ActionButton
-                    label={t("admin.editPerson")}
-                    icon={Pencil}
-                    onClick={() => onEdit(person)}
-                  />
+                  {onEdit && (
+                    <ActionButton
+                      label={t("admin.editPerson")}
+                      icon={Pencil}
+                      onClick={() => onEdit(person)}
+                    />
+                  )}
                 </td>
               </tr>
             ))}
@@ -1043,6 +1102,11 @@ function StaffTable({
                 <h3 className="break-words font-semibold text-sky-950">
                   {person.fullName}
                 </h3>
+                {person.role === "ADMIN" && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {t(`admin.levels.${person.adminLevel ?? "REGULAR"}`)}
+                  </p>
+                )}
                 <p className="mt-1 break-all text-sm text-slate-500">
                   {person.username}
                 </p>
@@ -1053,11 +1117,13 @@ function StaffTable({
               <span className="text-sm text-slate-500">
                 {new Date(person.createdAt).toLocaleDateString("es-EC")}
               </span>
-              <ActionButton
-                label={t("admin.editPerson")}
-                icon={Pencil}
-                onClick={() => onEdit(person)}
-              />
+              {onEdit && (
+                <ActionButton
+                  label={t("admin.editPerson")}
+                  icon={Pencil}
+                  onClick={() => onEdit(person)}
+                />
+              )}
             </div>
           </article>
         ))}
@@ -1066,28 +1132,96 @@ function StaffTable({
   );
 }
 
-function NotificationConfirmation({ student, onClose, onSent }: { student: Person; onClose: () => void; onSent: () => void }) {
+function NotificationConfirmation({
+  student,
+  onClose,
+  onSent,
+}: {
+  student: Person;
+  onClose: () => void;
+  onSent: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const validPhone = Boolean(student.primaryPhone?.trim());
   async function send() {
     if (!validPhone || busy) return;
-    setBusy(true); setError("");
-    try { await peopleApi.sendNotification(student.id); onSent(); }
-    catch { setError(t("notifications.error")); }
-    finally { setBusy(false); }
+    setBusy(true);
+    setError("");
+    try {
+      await peopleApi.sendNotification(student.id);
+      onSent();
+    } catch {
+      setError(t("notifications.error"));
+    } finally {
+      setBusy(false);
+    }
   }
-  return <Modal title={t("notifications.confirmTitle")} onClose={onClose} busy={busy}>
-    <dl className="grid gap-3 rounded-xl bg-slate-50 p-4 text-sm sm:grid-cols-2">
-      {[["notifications.student", student.fullName], ["notifications.representative", student.representativeName ?? t("admin.unavailable")], ["notifications.phone", student.primaryPhone ?? t("admin.unavailable")], ["notifications.type", t("notifications.pensionReminder")]].map(([label, value]) => <div key={label}><dt className="text-slate-500">{t(label)}</dt><dd className="font-semibold text-sky-950">{value}</dd></div>)}
-    </dl>
-    {!validPhone && <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{t("notifications.invalidPhone")}</p>}
-    {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
-    <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={busy} onClick={onClose} className="rounded-xl border px-4 py-2">{t("admin.cancel")}</button><button type="button" disabled={busy || !validPhone} onClick={() => void send()} className="primary-button">{t(busy ? "notifications.sending" : "notifications.confirmSend")}</button></div>
-  </Modal>;
+  return (
+    <Modal
+      title={t("notifications.confirmTitle")}
+      onClose={onClose}
+      busy={busy}
+    >
+      <dl className="grid gap-3 rounded-xl bg-slate-50 p-4 text-sm sm:grid-cols-2">
+        {[
+          ["notifications.student", student.fullName],
+          [
+            "notifications.representative",
+            student.representativeName ?? t("admin.unavailable"),
+          ],
+          [
+            "notifications.phone",
+            student.primaryPhone ?? t("admin.unavailable"),
+          ],
+          ["notifications.type", t("notifications.pensionReminder")],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-slate-500">{t(label)}</dt>
+            <dd className="font-semibold text-sky-950">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {!validPhone && (
+        <p
+          role="alert"
+          className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800"
+        >
+          {t("notifications.invalidPhone")}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="mt-4 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onClose}
+          className="rounded-xl border px-4 py-2"
+        >
+          {t("admin.cancel")}
+        </button>
+        <button
+          type="button"
+          disabled={busy || !validPhone}
+          onClick={() => void send()}
+          className="primary-button"
+        >
+          {t(busy ? "notifications.sending" : "notifications.confirmSend")}
+        </button>
+      </div>
+    </Modal>
+  );
 }
 
 export function AdminPage() {
+  const { user, refresh } = useAuth();
+  const [permissionsReady, setPermissionsReady] = useState(true);
+  const [permissionError, setPermissionError] = useState("");
+  const canManageAdmins = permissionsReady && canManageAdministrators(user);
   const [people, setPeople] = useState<Person[]>([]);
   const [tab, setTab] = useState<TabRole>("STUDENT");
   const [loading, setLoading] = useState(true);
@@ -1109,9 +1243,19 @@ export function AdminPage() {
   }
   useEffect(() => {
     void load();
-    void peopleApi.notificationCapabilities().then((value) => setNotificationEnabled(value.manualEnabled)).catch(() => setNotificationEnabled(false));
+    void peopleApi
+      .notificationCapabilities()
+      .then((value) => setNotificationEnabled(value.manualEnabled))
+      .catch(() => setNotificationEnabled(false));
   }, []);
   function saved() {
+    if (selected?.role === "ADMIN" && selected.id === user?.id) {
+      setPermissionsReady(false);
+      setPermissionError("");
+      void refresh()
+        .then(() => setPermissionsReady(true))
+        .catch(() => setPermissionError(t("admin.permissionsRefreshError")));
+    }
     setModal(null);
     setSelected(undefined);
     setSuccess(t("admin.saved"));
@@ -1173,17 +1317,19 @@ export function AdminPage() {
             <h2 className="text-xl font-semibold text-sky-950">
               {t(`admin.tabs.${tab}`)}
             </h2>
-            <button
-              className="primary-button w-full sm:w-auto"
-              onClick={() => {
-                setSelected(undefined);
-                setSuccess("");
-                setModal("create");
-              }}
-            >
-              <Plus size={18} />
-              {t(`admin.createByRole.${tab}`)}
-            </button>
+            {(tab !== "ADMIN" || canManageAdmins) && (
+              <button
+                className="primary-button w-full sm:w-auto"
+                onClick={() => {
+                  setSelected(undefined);
+                  setSuccess("");
+                  setModal("create");
+                }}
+              >
+                <Plus size={18} />
+                {t(`admin.createByRole.${tab}`)}
+              </button>
+            )}
           </div>
           {success && (
             <p
@@ -1191,6 +1337,14 @@ export function AdminPage() {
               className="mb-4 rounded-xl bg-emerald-50 p-3 text-emerald-800"
             >
               {success}
+            </p>
+          )}
+          {permissionError && (
+            <p
+              role="alert"
+              className="mb-4 rounded-xl bg-red-50 p-3 text-red-700"
+            >
+              {permissionError}
             </p>
           )}
           {loading ? (
@@ -1236,10 +1390,14 @@ export function AdminPage() {
               ) : (
                 <StaffTable
                   people={current}
-                  onEdit={(p) => {
-                    setSelected(p);
-                    setModal("edit");
-                  }}
+                  onEdit={
+                    tab === "ADMIN" && !canManageAdmins
+                      ? undefined
+                      : (p) => {
+                          setSelected(p);
+                          setModal("edit");
+                        }
+                  }
                 />
               )}
               {current.length === 0 && (
@@ -1250,7 +1408,7 @@ export function AdminPage() {
             </>
           )}
         </section>
-        {modal === "create" && (
+        {modal === "create" && (tab !== "ADMIN" || canManageAdmins) && (
           <Modal
             title={t(`admin.createByRole.${tab}`)}
             onClose={() => setModal(null)}
@@ -1266,24 +1424,26 @@ export function AdminPage() {
             )}
           </Modal>
         )}
-        {modal === "edit" && selected && (
-          <Modal title={t("admin.editPerson")} onClose={() => setModal(null)}>
-            {selected.role === "STUDENT" ? (
-              <StudentForm
-                student={selected}
-                onClose={() => setModal(null)}
-                onSaved={saved}
-              />
-            ) : (
-              <StaffForm
-                role={selected.role}
-                person={selected}
-                onClose={() => setModal(null)}
-                onSaved={saved}
-              />
-            )}
-          </Modal>
-        )}
+        {modal === "edit" &&
+          selected &&
+          (selected.role !== "ADMIN" || canManageAdmins) && (
+            <Modal title={t("admin.editPerson")} onClose={() => setModal(null)}>
+              {selected.role === "STUDENT" ? (
+                <StudentForm
+                  student={selected}
+                  onClose={() => setModal(null)}
+                  onSaved={saved}
+                />
+              ) : (
+                <StaffForm
+                  role={selected.role}
+                  person={selected}
+                  onClose={() => setModal(null)}
+                  onSaved={saved}
+                />
+              )}
+            </Modal>
+          )}
         {modal === "details" && selected && (
           <Modal
             title={t("admin.studentDetails")}

@@ -83,7 +83,11 @@ export async function readCycles(): Promise<AcademicCycle[]> {
 export async function getCycle(id: string): Promise<AcademicCycle> {
   return mapCycle(await api<CycleResponse>(`/api/admin/cycles/${id}`));
 }
-export type GroupAssignment = { groupId: number; pensionId: number | null };
+export type GroupAssignment = {
+  branchId: number;
+  groupId: number;
+  pensionId: number | null;
+};
 export async function saveCycle(
   cycle: {
     category: CycleCategory;
@@ -112,8 +116,15 @@ export async function saveCycle(
   );
 }
 export type CatalogGroup = ReusableGroup & { _count: { cycles: number } };
-export type Branch = { id: number; name: string; address: string | null; details: string | null; isActive: boolean; _count?: { groups: number; cycles: number } };
-export type ReusableGroup = { id: number; name: string; branchId: number; branch: Branch };
+export type Branch = {
+  id: number;
+  name: string;
+  address: string | null;
+  details: string | null;
+  isActive: boolean;
+  _count?: { groups: number; cycles: number };
+};
+export type ReusableGroup = { id: number; name: string };
 export type CatalogFee = EnrollmentFee & {
   _count: { cycles: number; cycleGroups: number; enrollments: number };
 };
@@ -155,9 +166,11 @@ export type CycleGroup = {
   name: string;
   _count: { enrollments: number };
   reusableGroup: ReusableGroup;
+  branch: Branch;
 };
 export type CycleEnrollment = {
   id: number;
+  createdAt: string;
   student: { id: number; fullName: string; dni: string };
   group: { id: number; name: string };
   branch: Branch;
@@ -171,7 +184,15 @@ export type CycleEnrollment = {
   pensionAmount: string | null;
   status: "ACTIVE";
 };
-export type EnrollmentTransfer = { id: number; transferDate: string; reason: string | null; previousBranch: Branch; newBranch: Branch; previousGroup: { reusableGroup: ReusableGroup }; newGroup: { reusableGroup: ReusableGroup } };
+export type EnrollmentTransfer = {
+  id: number;
+  transferDate: string;
+  reason: string | null;
+  previousBranch: Branch;
+  newBranch: Branch;
+  previousGroup: { reusableGroup: ReusableGroup };
+  newGroup: { reusableGroup: ReusableGroup };
+};
 export type AvailableStudent = {
   id: number;
   fullName: string;
@@ -179,10 +200,22 @@ export type AvailableStudent = {
 };
 export const cycleApi = {
   branches: () => api<Branch[]>("/api/admin/branches"),
-  saveBranch: (input: Pick<Branch, "name" | "address" | "details" | "isActive">, id?: number) => api<Branch>(id ? `/api/admin/branches/${id}` : "/api/admin/branches", input),
+  saveBranch: (
+    input: Pick<Branch, "name" | "address" | "details" | "isActive">,
+    id?: number,
+  ) =>
+    api<Branch>(
+      id ? `/api/admin/branches/${id}` : "/api/admin/branches",
+      input,
+    ),
   updateDetails: (
     id: number,
-    input: { feeId: number | null; name: string; startDate: string; endDate: string },
+    input: {
+      feeId: number | null;
+      name: string;
+      startDate: string;
+      endDate: string;
+    },
   ) =>
     api<CycleResponse>(`/api/admin/cycles/${id}/details`, input).then(mapCycle),
   reusablePensions: () => api<CatalogPension[]>("/api/admin/pensions"),
@@ -200,8 +233,39 @@ export const cycleApi = {
   closeCycle: (id: number) =>
     api<CycleResponse>(`/api/admin/cycles/${id}/close`, {}).then(mapCycle),
   groups: (id: string) => api<CycleGroup[]>(`/api/admin/cycles/${id}/groups`),
-  addCycleGroup: (id: string, groupId: number, pensionId: number) =>
-    api<CycleGroup>(`/api/admin/cycles/${id}/groups`, { groupId, pensionId }),
+  groupsForBranch: (id: string, branchId: string) =>
+    api<CycleGroup[]>(`/api/admin/cycles/${id}/branches/${branchId}/groups`),
+  availableGroups: (id: string, branchId: number) =>
+    api<CatalogGroup[]>(
+      `/api/admin/cycles/${id}/branches/${branchId}/available-groups`,
+    ),
+  addCycleBranch: (id: string, branchId: number) =>
+    api<{ branch: Branch }>(`/api/admin/cycles/${id}/branches`, { branchId }),
+  configureCycleBranch: (
+    id: string,
+    branchId: number,
+    groups: { groupId: number; pensionId: number }[],
+  ) =>
+    api<{ branchId: number }>(`/api/admin/cycles/${id}/branches/configure`, {
+      branchId,
+      groups,
+    }),
+  deleteCycleBranch: (id: string, branchId: number) =>
+    api<{ branchId: number }>(
+      `/api/admin/cycles/${id}/branches/${branchId}/delete`,
+      {},
+    ),
+  addCycleGroup: (
+    id: string,
+    branchId: number,
+    groupId: number,
+    pensionId: number,
+  ) =>
+    api<CycleGroup>(`/api/admin/cycles/${id}/groups`, {
+      branchId,
+      groupId,
+      pensionId,
+    }),
   deleteCycleGroup: (cycleId: string, groupId: number) =>
     api<{ id: number }>(
       `/api/admin/cycles/${cycleId}/groups/${groupId}/delete`,
@@ -210,9 +274,9 @@ export const cycleApi = {
   deleteGroup: (id: number) =>
     api<{ id: number }>(`/api/admin/groups/${id}/delete`, {}),
   reusableGroups: () => api<CatalogGroup[]>("/api/admin/groups"),
-  saveGroup: (name: string, branchId: number, id?: number) =>
+  saveGroup: (name: string, id?: number) =>
     api<ReusableGroup>(id ? `/api/admin/groups/${id}` : "/api/admin/groups", {
-      name, branchId,
+      name,
     }),
   deleteFee: (id: number) =>
     api<{ id: number }>(`/api/admin/fees/${id}/delete`, {}),
@@ -244,7 +308,19 @@ export const cycleApi = {
       preuniversityDueRule?: PreuniversityDueRule;
     },
   ) => api<CycleEnrollment>(`/api/admin/cycles/${id}/enrollments`, input),
-  transfer: (enrollmentId: number, input: { branchId: number; groupId: number; transferDate: string; reason: string }) => api<CycleEnrollment>(`/api/admin/cycles/enrollments/${enrollmentId}/transfer`, input),
+  transfer: (
+    enrollmentId: number,
+    input: {
+      branchId: number;
+      groupId: number;
+      transferDate: string;
+      reason: string;
+    },
+  ) =>
+    api<CycleEnrollment>(
+      `/api/admin/cycles/enrollments/${enrollmentId}/transfer`,
+      input,
+    ),
 };
 export function formatCycleDate(value: string): string {
   const [year, month, day] = value.split("-");

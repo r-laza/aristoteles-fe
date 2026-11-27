@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { t } from "../../lib/i18n";
 import { todayKey } from "../cycles/cycles";
 import {
@@ -29,12 +29,15 @@ export function RegisterPayment({
   row,
   onCancel,
   onSaved,
+  onBusyChange,
 }: {
   row: PaymentRow;
   onCancel: () => void;
-  onSaved: (registration: PaymentRegistration) => void;
+  onSaved: (registration: PaymentRegistration, evidence?: File) => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState("");
   const [payerErrors, setPayerErrors] = useState<PayerFieldErrors>({});
   const [documentType, setDocumentType] = useState<ReceiptDocumentType>(
@@ -84,7 +87,7 @@ export function RegisterPayment({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
+    if (submitting.current) return;
     const data = new FormData(event.currentTarget);
     const amountNumber = Number(amount);
     if (
@@ -133,7 +136,9 @@ export function RegisterPayment({
       return;
     }
     setPayerErrors({});
+    submitting.current = true;
     setBusy(true);
+    onBusyChange?.(true);
     setError("");
     try {
       const registration = await paymentsApi.register(row.id, {
@@ -152,20 +157,12 @@ export function RegisterPayment({
         payerRelationship,
         payerRelationshipOther,
       });
-      if (evidence instanceof File && evidence.size > 0) {
-        for (const [index, payment] of registration.payments.entries()) {
-          try {
-            registration.payments[index] = await paymentsApi.uploadEvidence(
-              payment.id,
-              evidence,
-            );
-          } catch {
-            registration.evidenceUploadFailed = true;
-          }
-        }
-      }
-      onSaved(registration);
+      onSaved(
+        registration,
+        evidence instanceof File && evidence.size > 0 ? evidence : undefined,
+      );
     } catch (cause) {
+      submitting.current = false;
       setError(
         t(
           cause instanceof ApiError && cause.status === 409
@@ -175,6 +172,7 @@ export function RegisterPayment({
       );
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
   }
 

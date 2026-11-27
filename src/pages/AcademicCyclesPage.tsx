@@ -1,9 +1,5 @@
 import { CycleCardMenu } from "../features/cycles/CycleCardMenu";
-import {
-  EditCycleModal,
-  DeleteCycleModal,
-} from "../features/cycles/CycleActions";
-import { CycleForm } from "../features/cycles/CycleForm";
+import { DeleteCycleModal } from "../features/cycles/CycleActions";
 import { CycleModal } from "../features/cycles/CycleModal";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -28,9 +24,7 @@ export function AcademicCyclesPage() {
   const [branchId, setBranchId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
   const [success, setSuccess] = useState("");
-  const [editing, setEditing] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<AcademicCycle | null>(null);
   const [transitioning, setTransitioning] = useState<AcademicCycle | null>(null);
   const [transitionBusy, setTransitionBusy] = useState(false);
@@ -75,16 +69,13 @@ export function AcademicCyclesPage() {
             </h1>
             <p className="mt-2 text-slate-500">{t("cycles.subtitle")}</p>
           </div>
-          <button
+          <Link
+            to="/admin/cycles/new"
             className="primary-button"
-            onClick={() => {
-              setSuccess("");
-              setOpen(true);
-            }}
           >
             <Plus size={18} aria-hidden="true" />
             {t("cycles.create")}
-          </button>
+          </Link>
         </div>
         {success && (
           <p
@@ -160,8 +151,7 @@ export function AcademicCyclesPage() {
                       </div>
                       <CycleCardMenu
                         onEdit={() => {
-                          setSuccess("");
-                          setEditing(cycle.id);
+                          navigate(`/admin/cycles/${cycle.id}/edit`);
                         }}
                         onDelete={() => {
                           setSuccess("");
@@ -234,22 +224,6 @@ export function AcademicCyclesPage() {
             })}
           </ol>
         )}
-        {editing !== null && (
-          <EditCycleModal
-            key={editing}
-            id={editing}
-            onClose={() => setEditing(null)}
-            onSaved={(updated) => {
-              setCycles((current) =>
-                current.map((cycle) =>
-                  cycle.id === updated.id ? updated : cycle,
-                ),
-              );
-              setEditing(null);
-              setSuccess("cycles.updated");
-            }}
-          />
-        )}
         {deleting && (
           <DeleteCycleModal
             cycle={deleting}
@@ -260,17 +234,6 @@ export function AcademicCyclesPage() {
               );
               setDeleting(null);
               setSuccess("cycleActions.deleted");
-            }}
-          />
-        )}
-        {open && (
-          <CycleForm
-            onClose={() => setOpen(false)}
-            onCreated={(created) => {
-              setOpen(false);
-              navigate(`/admin/cycles/${created.id}`, {
-                state: { cycle: created, created: true },
-              });
             }}
           />
         )}

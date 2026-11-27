@@ -1,10 +1,12 @@
 export const roles = ["ADMIN", "TEACHER", "STUDENT"] as const;
 export type Role = (typeof roles)[number];
+export type AdminLevel = "MAIN" | "REGULAR";
 export type User = {
   id: number;
   username: string;
   fullName: string;
   role: Role;
+  adminLevel: AdminLevel;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -16,6 +18,7 @@ export type Person = {
   fullName: string;
   username: string | null;
   role: Role;
+  adminLevel?: AdminLevel;
   isActive: boolean;
   createdAt: string;
   dni?: string;
@@ -32,5 +35,9 @@ export type Person = {
   secondaryPhone?: string | null;
   accessIsActive?: boolean | null;
 };
+export const canManageAdministrators = (user: User | null) =>
+  Boolean(
+    user?.isActive && user.role === "ADMIN" && user.adminLevel === "MAIN",
+  );
 export const dashboardPath = (role: Role) =>
   role === "ADMIN" ? "/admin" : role === "TEACHER" ? "/teacher" : "/";

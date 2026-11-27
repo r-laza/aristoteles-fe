@@ -40,8 +40,17 @@ export function CyclePayments({
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const visibleRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  const branches = Array.from(
+    new Map(data.rows.map((row) => [row.branch.id, row.branch])).values(),
+  );
   const groups = Array.from(
-    new Map(data.rows.map((row) => [row.group.id, row.group])).values(),
+    new Map(
+      data.rows
+        .filter(
+          (row) => !filters.branch || String(row.branch.id) === filters.branch,
+        )
+        .map((row) => [row.group.id, row.group]),
+    ).values(),
   );
   const months = Array.from(
     new Set(
@@ -86,6 +95,7 @@ export function CyclePayments({
           </div>
           <PaymentFilters
             filters={filters}
+            branches={branches}
             groups={groups}
             months={months}
             onChange={(value) => { setFilters(value); setPage(1); }}

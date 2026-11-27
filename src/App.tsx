@@ -17,6 +17,9 @@ import { EnrollmentsPensionsPage } from "./pages/EnrollmentsPensionsPage";
 import { GroupDetailPage } from "./pages/GroupDetailPage";
 import { CycleEnrollmentsPage } from "./pages/CycleEnrollmentsPage";
 import { BranchesPage } from "./pages/BranchesPage";
+import { CycleFormPage } from "./pages/CycleFormPage";
+import { EnrollmentsPage } from "./pages/EnrollmentsPage";
+import { ProfilePage } from "./pages/ProfilePage";
 
 function App() {
   return (
@@ -51,6 +54,7 @@ function App() {
           </Route>
           <Route element={<ProtectedRoute role="ADMIN" />}>
             <Route path="/admin" element={<AdminDashboardPage />} />
+            <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
             <Route path="/admin/payments" element={<PaymentsPage />} />
             <Route
               path="/admin/payments/:enrollmentId/manage"
@@ -58,6 +62,7 @@ function App() {
             />
             <Route path="/admin/users" element={<AdminPage />} />
             <Route path="/admin/cycles" element={<AcademicCyclesPage />} />
+            <Route path="/admin/cycles/new" element={<CycleFormPage />} />
             <Route path="/admin/groups" element={<GroupsPage />} />
             <Route path="/admin/branches" element={<BranchesPage />} />
             <Route path="/admin/groups/:id" element={<GroupDetailPage />} />
@@ -69,6 +74,7 @@ function App() {
               path="/admin/cycles/:id"
               element={<AcademicCycleDetailPage />}
             />
+            <Route path="/admin/cycles/:id/edit" element={<CycleFormPage />} />
             <Route
               path="/admin/cycles/:id/enrollments"
               element={<CycleEnrollmentsPage />}
@@ -88,12 +94,7 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route
               path="/profile"
-              element={
-                <PlaceholderPage
-                  title={t("placeholders.profile")}
-                  description={t("placeholders.description")}
-                />
-              }
+              element={<ProfilePage />}
             />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
