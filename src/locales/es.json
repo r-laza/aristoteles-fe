@@ -713,6 +713,7 @@
     "registerSubtitle": "Selecciona las obligaciones y completa los datos del pago.",
     "manage": "Gestionar pagos",
     "manageSubtitle": "Registra pagos y consulta el historial del estudiante en este ciclo académico.",
+    "initialPaymentHelp": "La inscripción se confirmará únicamente cuando este primer pago se registre correctamente.",
     "manageTabs": "Gestión de pagos del estudiante",
     "payer": "Pagador",
     "actions": "Acciones",

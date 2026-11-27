@@ -20,9 +20,11 @@ import { money } from "../features/payments/formatting";
 import { t } from "../lib/i18n";
 import {
   paymentsApi,
+  type EnrollmentPaymentDraft,
   type PaymentRegistration,
   type PaymentRow,
 } from "../services/payments.api";
+import { ENROLLMENT_DRAFT_KEY } from "../features/payments/enrollmentDraft";
 
 type RegistrationData = { row: PaymentRow; cycleId: number };
 
@@ -49,8 +51,19 @@ export function RegisterPaymentPage() {
   const navigate = useNavigate();
   const { enrollmentId: enrollmentIdParam } = useParams();
   const [searchParams] = useSearchParams();
-  const [data, setData] = useState<RegistrationData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [draft] = useState<EnrollmentPaymentDraft | null>(() => {
+    if (enrollmentIdParam !== "new-enrollment") return null;
+    try {
+      const stored = window.sessionStorage.getItem(ENROLLMENT_DRAFT_KEY);
+      return stored ? (JSON.parse(stored) as EnrollmentPaymentDraft) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [data, setData] = useState<RegistrationData | null>(
+    draft ? { row: draft.row, cycleId: draft.cycleId } : null,
+  );
+  const [loading, setLoading] = useState(!draft);
   const [error, setError] = useState(false);
   const [completed, setCompleted] = useState<PaymentRegistration | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -68,14 +81,21 @@ export function RegisterPaymentPage() {
     searchParams.get("tab") === "history" ? "history" : "register",
   );
   const enrollmentId = Number(enrollmentIdParam);
+  const [currentEnrollmentId, setCurrentEnrollmentId] = useState(enrollmentId);
   const cycleIdParam = Number(searchParams.get("cycleId"));
   const requestedCycleId =
     Number.isInteger(cycleIdParam) && cycleIdParam > 0 ? cycleIdParam : null;
   const returnToCycle = searchParams.get("returnTo") === "cycle";
   const returnToEnrollments = searchParams.get("returnTo") === "enrollments";
   const returnBranchId = Number(searchParams.get("branchId"));
+  const returnGroupId = Number(searchParams.get("groupId"));
 
   useEffect(() => {
+    if (draft) {
+      setLoading(false);
+      setError(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     const registration =
@@ -98,7 +118,7 @@ export function RegisterPaymentPage() {
     return () => {
       cancelled = true;
     };
-  }, [enrollmentId, requestedCycleId]);
+  }, [draft, enrollmentId, requestedCycleId]);
 
   const paymentsPath = data?.cycleId
     ? `/admin/payments?cycleId=${data.cycleId}`
@@ -107,7 +127,7 @@ export function RegisterPaymentPage() {
     ? `/admin/cycles/${data.cycleId}`
     : paymentsPath;
   const enrollmentsPath = data?.cycleId
-    ? `/admin/enrollments?cycleId=${data.cycleId}${Number.isInteger(returnBranchId) && returnBranchId > 0 ? `&branchId=${returnBranchId}` : ""}`
+    ? `/admin/enrollments?cycleId=${data.cycleId}${Number.isInteger(returnBranchId) && returnBranchId > 0 ? `&branchId=${returnBranchId}` : ""}${Number.isInteger(returnGroupId) && returnGroupId > 0 ? `&groupId=${returnGroupId}` : ""}`
     : "/admin/enrollments";
   const returnPath = returnToEnrollments
     ? enrollmentsPath
@@ -115,13 +135,13 @@ export function RegisterPaymentPage() {
       ? cyclePath
       : paymentsPath;
 
-  async function refreshBalances() {
+  async function refreshBalances(targetEnrollmentId = currentEnrollmentId) {
     if (!data) return;
     setRefreshingBalances(true);
     setRefreshError("");
     try {
       const balances = await paymentsApi.balances(data.cycleId);
-      const row = balances.rows.find((item) => item.id === enrollmentId);
+      const row = balances.rows.find((item) => item.id === targetEnrollmentId);
       if (!row) {
         setRefreshError(t("payments.balanceRefreshError"));
         return;
@@ -155,10 +175,19 @@ export function RegisterPaymentPage() {
   }
 
   function paymentSaved(registration: PaymentRegistration, evidence?: File) {
+    if (registration.enrollmentId) {
+      setCurrentEnrollmentId(registration.enrollmentId);
+      setData((current) =>
+        current
+          ? { ...current, row: { ...current.row, id: registration.enrollmentId! } }
+          : current,
+      );
+      window.sessionStorage.removeItem(ENROLLMENT_DRAFT_KEY);
+    }
     setCompleted(registration);
     setActiveTab("history");
     setHistoryVersion((value) => value + 1);
-    void refreshBalances();
+    void refreshBalances(registration.enrollmentId ?? currentEnrollmentId);
     if (evidence) {
       const pending = {
         file: evidence,
@@ -189,6 +218,11 @@ export function RegisterPaymentPage() {
           </h1>
           <p className="mt-2 text-slate-500">{t("payments.manageSubtitle")}</p>
         </div>
+        {draft && !completed && (
+          <p className="mb-6 rounded-xl border border-cyan-100 bg-cyan-50 p-4 text-sm text-sky-900">
+            {t("payments.initialPaymentHelp")}
+          </p>
+        )}
 
         {loading ? (
           <p role="status" className="rounded-2xl bg-white p-6">
@@ -288,6 +322,9 @@ export function RegisterPaymentPage() {
                 >
                   {t("receipts.view")}
                 </button>
+                <Link to={enrollmentsPath} className="primary-button mt-3 ml-3">
+                  {t("payments.backToEnrollments")}
+                </Link>
               </div>
             )}
             {refreshError && (
@@ -331,6 +368,11 @@ export function RegisterPaymentPage() {
                 onCancel={() => navigate(returnPath)}
                 onSaved={paymentSaved}
                 onBusyChange={setRegistering}
+                registerPayment={
+                  draft && !completed
+                    ? (input) => paymentsApi.registerInitial(draft, input)
+                    : undefined
+                }
               />
             ) : (
               <PaymentHistory

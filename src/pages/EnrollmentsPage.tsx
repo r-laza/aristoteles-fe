@@ -207,24 +207,6 @@ export function EnrollmentsPage() {
     cycle?.status === "ACTIVE" && branchId && selectedGroup,
   );
 
-  async function enrollmentCompleted() {
-    setSelectedStudent(null);
-    setError("");
-    try {
-      const [availableStudents, enrollmentRows] = await Promise.all([
-        cycleApi.available(cycleId),
-        cycleApi.enrollments(cycleId),
-      ]);
-      setStudents(availableStudents);
-      setEnrollments(enrollmentRows);
-      setSuccess(t("enrollmentsModule.enrolledSuccess"));
-      setTab("enrolled");
-      setPage(1);
-    } catch {
-      setError(t("enrollmentPage.refreshError"));
-    }
-  }
-
   function studentCreated(person: Person) {
     setCreatingStudent(false);
     if (person.kind !== "STUDENT" || !person.dni || !person.isActive) return;
@@ -232,6 +214,12 @@ export function EnrollmentsPage() {
       id: person.id,
       fullName: person.fullName,
       dni: person.dni,
+      representativeName: person.representativeName ?? "",
+      representativeDocumentType: person.representativeDocumentType ?? null,
+      representativeDocumentNumber: person.representativeDocumentNumber ?? null,
+      relationship: person.relationship ?? "OTHER",
+      relationshipOther: person.relationshipOther ?? null,
+      primaryPhone: person.primaryPhone ?? "",
     };
     setStudents((current) => [
       created,
@@ -353,7 +341,7 @@ export function EnrollmentsPage() {
         <PersonModal title={t("admin.createByRole.STUDENT")} onClose={() => setCreatingStudent(false)}><StudentForm onClose={() => setCreatingStudent(false)} onSaved={studentCreated} /></PersonModal>
       )}
       {selectedStudent && cycle && selectedGroup?.pension && (cycle.category === "PREUNIVERSITY" || cycle.fee) && (
-        <EnrollmentConfirmation cycle={cycle} group={selectedGroup} student={selectedStudent} onClose={() => setSelectedStudent(null)} onEnrolled={() => void enrollmentCompleted()} />
+        <EnrollmentConfirmation cycle={cycle} group={selectedGroup} student={selectedStudent} onClose={() => setSelectedStudent(null)} />
       )}
     </AppLayout>
   );

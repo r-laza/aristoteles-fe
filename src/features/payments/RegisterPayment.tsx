@@ -6,11 +6,13 @@ import {
   methods,
   type Obligation,
   type PaymentRegistration,
+  type PaymentInput,
   type PaymentRow,
   type ReceiptDocumentType,
   type ReceiptRelationship,
 } from "../../services/payments.api";
 import { ApiError } from "../../services/api";
+import { enrollmentErrorKey } from "../cycles/enrollment";
 import { money, periodLabel } from "./formatting";
 import {
   payerFieldValue,
@@ -30,11 +32,13 @@ export function RegisterPayment({
   onCancel,
   onSaved,
   onBusyChange,
+  registerPayment,
 }: {
   row: PaymentRow;
   onCancel: () => void;
   onSaved: (registration: PaymentRegistration, evidence?: File) => void;
   onBusyChange?: (busy: boolean) => void;
+  registerPayment?: (input: PaymentInput) => Promise<PaymentRegistration>;
 }) {
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
@@ -141,7 +145,7 @@ export function RegisterPayment({
     onBusyChange?.(true);
     setError("");
     try {
-      const registration = await paymentsApi.register(row.id, {
+      const input: PaymentInput = {
         obligations: selectedCharges.map((charge) => ({
           paymentType: charge.paymentType,
           period: charge.period,
@@ -156,7 +160,10 @@ export function RegisterPayment({
         payerDocumentNumber,
         payerRelationship,
         payerRelationshipOther,
-      });
+      };
+      const registration = await (registerPayment
+        ? registerPayment(input)
+        : paymentsApi.register(row.id, input));
       onSaved(
         registration,
         evidence instanceof File && evidence.size > 0 ? evidence : undefined,
@@ -165,7 +172,12 @@ export function RegisterPayment({
       submitting.current = false;
       setError(
         t(
-          cause instanceof ApiError && cause.status === 409
+          cause instanceof ApiError &&
+            (cause.code?.startsWith("ENROLLMENT_") ||
+              cause.code === "STUDENT_ACTIVE_CYCLE_ENROLLMENT" ||
+              cause.code === "CYCLE_NOT_ACTIVE")
+            ? enrollmentErrorKey(cause)
+            : cause instanceof ApiError && cause.status === 409
             ? "payments.obligationChanged"
             : "payments.saveError",
         ),

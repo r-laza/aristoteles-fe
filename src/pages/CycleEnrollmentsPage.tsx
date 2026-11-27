@@ -10,7 +10,6 @@ import { AppLayout } from "../components/layout/AppLayout";
 import { CycleModal } from "../features/cycles/CycleModal";
 import {
   calculateFixedDiscount,
-  enrollmentErrorKey,
 } from "../features/cycles/enrollment";
 import {
   cycleApi,
@@ -25,6 +24,10 @@ import { Modal as PersonModal, StudentForm } from "./AdminPage";
 import type { Person } from "../auth/types";
 import { t } from "../lib/i18n";
 import { ApiError } from "../services/api";
+import {
+  createEnrollmentPaymentDraft,
+  ENROLLMENT_DRAFT_KEY,
+} from "../features/payments/enrollmentDraft";
 
 const money = (value: number | string) =>
   t("cycles.amount", {
@@ -39,14 +42,13 @@ export function EnrollmentConfirmation({
   group,
   student,
   onClose,
-  onEnrolled,
 }: {
   cycle: AcademicCycle;
   group: CycleGroup;
   student: AvailableStudent;
   onClose: () => void;
-  onEnrolled: (enrollment: CycleEnrollment) => void;
 }) {
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pensionDiscountAmount, setPensionDiscountAmount] = useState("0.00");
@@ -70,28 +72,21 @@ export function EnrollmentConfirmation({
       return;
     }
     const data = new FormData(event.currentTarget);
-    setBusy(true);
     setError("");
-    try {
-      const enrollment = await cycleApi.enroll(String(cycle.id), {
-        studentId: student.id,
-        branchId: group.branch.id,
-        groupId: group.id,
-        pensionDiscountAmount: pensionDiscountAmount || "0",
-        discountReason: String(data.get("discountReason") ?? "").trim(),
-        ...(cycle.category === "PREUNIVERSITY"
-          ? {
-              preuniversityInstallments,
-              preuniversityDueRule,
-            }
-          : {}),
-      });
-      onEnrolled(enrollment);
-    } catch (cause) {
-      setError(t(enrollmentErrorKey(cause)));
-    } finally {
-      setBusy(false);
-    }
+    const draft = createEnrollmentPaymentDraft(
+      cycle,
+      group,
+      student,
+      pensionDiscountAmount || "0",
+      String(data.get("discountReason") ?? "").trim(),
+      preuniversityInstallments,
+      preuniversityDueRule,
+    );
+    window.sessionStorage.setItem(ENROLLMENT_DRAFT_KEY, JSON.stringify(draft));
+    onClose();
+    navigate(
+      `/admin/payments/new-enrollment/manage?cycleId=${cycle.id}&branchId=${group.branch.id}&groupId=${group.id}&returnTo=enrollments`,
+    );
   }
 
   return (
@@ -488,26 +483,6 @@ export function CycleEnrollmentsPage() {
       .includes(normalizedSearch),
   );
 
-  async function enrollmentCompleted(
-    enrollment: CycleEnrollment,
-    student: AvailableStudent,
-    group: CycleGroup,
-  ) {
-    setSelectedStudent(null);
-    setSuccess("");
-    setCompletedEnrollment({ enrollment, student, group });
-    try {
-      const [available, currentEnrollments] = await Promise.all([
-        cycleApi.available(id),
-        cycleApi.enrollments(id),
-      ]);
-      setStudents(available);
-      setEnrollments(currentEnrollments);
-    } catch {
-      setError(t("enrollmentPage.refreshError"));
-    }
-  }
-
   function studentCreated(person: Person) {
     setCreatingStudent(false);
     if (person.kind !== "STUDENT" || !person.dni || !person.isActive) return;
@@ -515,6 +490,12 @@ export function CycleEnrollmentsPage() {
       id: person.id,
       fullName: person.fullName,
       dni: person.dni,
+      representativeName: person.representativeName ?? "",
+      representativeDocumentType: person.representativeDocumentType ?? null,
+      representativeDocumentNumber: person.representativeDocumentNumber ?? null,
+      relationship: person.relationship ?? "OTHER",
+      relationshipOther: person.relationshipOther ?? null,
+      primaryPhone: person.primaryPhone ?? "",
     };
     setStudents((current) => [
       created,
@@ -859,13 +840,6 @@ export function CycleEnrollmentsPage() {
               group={selectedGroup}
               student={selectedStudent}
               onClose={() => setSelectedStudent(null)}
-              onEnrolled={(enrollment) =>
-                void enrollmentCompleted(
-                  enrollment,
-                  selectedStudent,
-                  selectedGroup,
-                )
-              }
             />
           )}
         {completedEnrollment && cycle && (
