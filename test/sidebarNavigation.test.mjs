@@ -12,6 +12,7 @@ test("admin sidebar keeps Inicio standalone above the three sections", async () 
 
   assert.ok(home >= 0 && sections > home);
   assert.match(sidebar, /min-h-11 items-center rounded-xl text-sm font-medium/);
+  assert.match(sidebar, /canManageAdministrators\(user\) &&/);
 });
 
 test("admin modules use the requested section order without duplication", async () => {
@@ -87,5 +88,6 @@ test("Inscripciones route renders the centralized enrollment module", async () =
   assert.match(app, /path="\/admin\/enrollments"/);
   assert.match(page, /enrollmentsModule\.title/);
   assert.match(page, /cycleApi\.enrollments\(cycleId\)/);
-  assert.match(page, /\/admin\/cycles\/\$\{cycleId\}\/enrollments/);
+  assert.match(page, /EnrollmentConfirmation/);
+  assert.doesNotMatch(page, /\/admin\/cycles\/\$\{cycleId\}\/enrollments/);
 });

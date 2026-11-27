@@ -18,6 +18,9 @@ test("financial dashboard exposes hierarchical filters and read-only debtor deta
   const pageSource = await readFile(new URL("../src/pages/AdminDashboardPage.tsx", import.meta.url), "utf8");
   const listSource = await readFile(new URL("../src/features/dashboard/DashboardFinancialLists.tsx", import.meta.url), "utf8");
   assert.match(pageSource, /cycle\.status\.toLowerCase\(\)/);
+  assert.match(pageSource, /adminDashboard\.allBranches/);
+  assert.match(pageSource, /BranchEnrollmentChart/);
+  assert.match(pageSource, /BranchEnrollmentTable/);
   assert.match(pageSource, /DashboardFinancialLists/);
   assert.match(listSource, /fetchDashboardPayments/);
   assert.match(listSource, /fetchDashboardDebtors/);

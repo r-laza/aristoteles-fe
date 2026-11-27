@@ -78,8 +78,8 @@ export function pendingFor(rows: PaymentRow[], type: PaymentType) {
   );
 }
 
-// Account-level status shared with the server. Overdue debt has priority over
-// future pending installments; partial payment never creates a fourth status.
+// Account-level status shared with the server. Overdue debt has priority,
+// followed by partial payments and then fully unpaid obligations in the window.
 export function accountStatus(
   charges: Obligation[],
   today: string,
@@ -89,6 +89,7 @@ export function accountStatus(
   const pending = charges.filter((c) => Number(c.balance) > 0);
   if (!pending.length) return "PAID";
   if (pending.some((c) => c.dueDate && c.dueDate < today)) return "OVERDUE";
+  if (pending.some((c) => Number(c.amountPaid) > 0)) return "PARTIAL";
   const warningThrough = new Date(`${today}T00:00:00Z`);
   warningThrough.setUTCDate(warningThrough.getUTCDate() + warningDays);
   const boundary = warningThrough.toISOString().slice(0, 10);

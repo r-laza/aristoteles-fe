@@ -74,6 +74,22 @@ export type PaymentRegistration = {
   totalAmount: string;
   obligationCount: number;
   evidenceUploadFailed?: boolean;
+  enrollmentId?: number;
+};
+export type EnrollmentPaymentDraft = {
+  cycleId: number;
+  branchId: number;
+  groupId: number;
+  enrollment: {
+    studentId: number;
+    branchId: number;
+    groupId: number;
+    pensionDiscountAmount: string;
+    discountReason: string;
+    preuniversityInstallments?: number;
+    preuniversityDueRule?: "FIFTEENTH" | "LAST_DAY";
+  };
+  row: PaymentRow;
 };
 export type Payment = Omit<
   PaymentInput,
@@ -143,6 +159,12 @@ export const paymentsApi = {
   balances: (id: number) => api<Balances>(`/api/admin/payments/cycles/${id}`),
   register: (id: number, input: PaymentInput) =>
     api<PaymentRegistration>(`/api/admin/payments/enrollments/${id}`, input),
+  registerInitial: (draft: EnrollmentPaymentDraft, payment: PaymentInput) =>
+    api<PaymentRegistration>("/api/admin/payments/initial-enrollment", {
+      cycleId: draft.cycleId,
+      enrollment: draft.enrollment,
+      payment,
+    }),
   history: (id: number) =>
     api<Payment[]>(`/api/admin/payments/enrollments/${id}`),
   receipt: (id: number) =>

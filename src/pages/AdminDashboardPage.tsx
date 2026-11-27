@@ -15,8 +15,9 @@ import {
 import { AppLayout } from "../components/layout/AppLayout";
 import {
   ChartLegend,
+  BranchEnrollmentChart,
+  BranchEnrollmentTable,
   DonutChart,
-  EnrollmentGroupChart,
   MonthlyRevenueChart,
 } from "../components/dashboard/AdminDashboardCharts";
 import { DashboardFinancialLists } from "../features/dashboard/DashboardFinancialLists";
@@ -123,21 +124,22 @@ export function AdminDashboardPage() {
             <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <FilterSelect
                 disabled={loading}
-                label={t("cycles.branch")}
-                value={filters.branchId}
-                options={data.branches}
-                onChange={(branchId) => load({ branchId })}
-              />
-              <FilterSelect
-                disabled={loading}
                 label={t("payments.cycle")}
                 value={filters.cycleId}
                 options={data.cycles}
                 getOptionLabel={(cycle) =>
                   `${cycle.name} — ${t(`cycles.${cycle.status.toLowerCase()}`)}`
                 }
-                onChange={(cycleId) =>
-                  load({ branchId: filters.branchId, cycleId })
+                onChange={(cycleId) => load({ cycleId })}
+              />
+              <FilterSelect
+                disabled={loading || !filters.cycleId}
+                label={t("cycles.branch")}
+                value={filters.branchId}
+                options={data.branches}
+                allLabel={t("adminDashboard.allBranches")}
+                onChange={(branchId) =>
+                  load({ cycleId: filters.cycleId, branchId })
                 }
               />
               <FilterSelect
@@ -205,27 +207,17 @@ export function AdminDashboardPage() {
                 </article>
               ))}
             </section>
-            <div className="mt-6 grid gap-6 xl:grid-cols-2">
-              <Panel title={t("adminDashboard.schoolEnrollmentGroups")}>
+            <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+              <Panel title={t("adminDashboard.enrollmentByBranch")}>
                 <p className="mb-5 text-sm text-slate-500">
                   {t("adminDashboard.chartStudentTotal", {
-                    count: summary.schoolEnrollments,
+                    count: summary.enrolledStudents,
                   })}
                 </p>
-                <EnrollmentGroupChart
-                  data={dashboard.enrollmentDistribution.school}
-                />
+                <BranchEnrollmentChart data={dashboard.enrollmentComparison} />
               </Panel>
-              <Panel title={t("adminDashboard.preuniversityEnrollmentGroups")}>
-                <p className="mb-5 text-sm text-slate-500">
-                  {t("adminDashboard.chartStudentTotal", {
-                    count: summary.preuniversityEnrollments,
-                  })}
-                </p>
-                <EnrollmentGroupChart
-                  data={dashboard.enrollmentDistribution.preuniversity}
-                  color="#7c3aed"
-                />
+              <Panel title={t("adminDashboard.enrollmentComparisonTable")}>
+                <BranchEnrollmentTable data={dashboard.enrollmentComparison} />
               </Panel>
             </div>
             <div className="mt-6 grid gap-6 xl:grid-cols-2">

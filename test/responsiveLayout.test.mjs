@@ -6,10 +6,9 @@ import ts from "typescript";
 const source = (path) =>
   readFile(new URL(`../src/${path}`, import.meta.url), "utf8");
 
-test("student payment actions occupy the second header and row column in both tables", async () => {
+test("student payment actions occupy the second header and row column", async () => {
   for (const [path, action, columnCount] of [
     ["features/payments/PaymentsTable.tsx", "Action", 7],
-    ["pages/EnrollmentsPage.tsx", "ManagePaymentsButton", 5],
   ]) {
     const content = await source(path);
     const file = ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);

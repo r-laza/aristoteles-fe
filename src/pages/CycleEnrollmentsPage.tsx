@@ -8,7 +8,10 @@ import {
 } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { CycleModal } from "../features/cycles/CycleModal";
-import { calculateDiscount } from "../features/cycles/enrollment";
+import {
+  calculateFixedDiscount,
+  enrollmentErrorKey,
+} from "../features/cycles/enrollment";
 import {
   cycleApi,
   formatCycleDate,
@@ -31,7 +34,7 @@ const money = (value: number | string) =>
     }),
   });
 
-function EnrollmentConfirmation({
+export function EnrollmentConfirmation({
   cycle,
   group,
   student,
@@ -46,19 +49,14 @@ function EnrollmentConfirmation({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [enrollmentPercent, setEnrollmentPercent] = useState("0");
-  const [pensionPercent, setPensionPercent] = useState("0");
+  const [pensionDiscountAmount, setPensionDiscountAmount] = useState("0.00");
   const [preuniversityInstallments, setPreuniversityInstallments] = useState(1);
   const [preuniversityDueRule, setPreuniversityDueRule] = useState<
     "FIFTEENTH" | "LAST_DAY"
   >("FIFTEENTH");
-  const feeDiscount = calculateDiscount(
-    Number(cycle.fee?.amount ?? 0),
-    enrollmentPercent,
-  );
-  const pensionDiscount = calculateDiscount(
+  const pensionDiscount = calculateFixedDiscount(
     Number(group.pension?.amount ?? 0),
-    pensionPercent,
+    pensionDiscountAmount,
   );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -66,10 +64,9 @@ function EnrollmentConfirmation({
     if (
       (cycle.category === "SCHOOL" && !cycle.fee) ||
       !group.pension ||
-      !feeDiscount.valid ||
       !pensionDiscount.valid
     ) {
-      setError(t("cycleDetail.invalidDiscount"));
+      setError(t("enrollmentPage.invalidPensionDiscount"));
       return;
     }
     const data = new FormData(event.currentTarget);
@@ -80,8 +77,7 @@ function EnrollmentConfirmation({
         studentId: student.id,
         branchId: group.branch.id,
         groupId: group.id,
-        discountPercent: enrollmentPercent || "0",
-        pensionDiscountPercent: pensionPercent || "0",
+        pensionDiscountAmount: pensionDiscountAmount || "0",
         discountReason: String(data.get("discountReason") ?? "").trim(),
         ...(cycle.category === "PREUNIVERSITY"
           ? {
@@ -92,13 +88,7 @@ function EnrollmentConfirmation({
       });
       onEnrolled(enrollment);
     } catch (cause) {
-      setError(
-        t(
-          cause instanceof ApiError && cause.status === 409
-            ? "cycleDetail.duplicate"
-            : "cycleDetail.saveError",
-        ),
-      );
+      setError(t(enrollmentErrorKey(cause)));
     } finally {
       setBusy(false);
     }
@@ -188,39 +178,7 @@ function EnrollmentConfirmation({
               </div>
             </section>
           )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            {cycle.category === "SCHOOL" && (
-              <div>
-                <label htmlFor="enrollment-discount" className="field-label">
-                  {t("enrollmentPage.enrollmentDiscount")}
-                </label>
-                <input
-                  id="enrollment-discount"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={enrollmentPercent}
-                  onChange={(event) => setEnrollmentPercent(event.target.value)}
-                  className="field"
-                />
-                <div
-                  className="mt-3 rounded-xl border border-cyan-100 bg-cyan-50/70 p-4"
-                  aria-live="polite"
-                >
-                  <p className="text-sm font-medium text-sky-700">
-                    {t("enrollmentPage.finalEnrollment")}
-                  </p>
-                  <p
-                    className={`mt-1 text-2xl font-bold tabular-nums ${feeDiscount.valid ? "text-sky-950" : "text-red-700"}`}
-                  >
-                    {feeDiscount.valid
-                      ? money(feeDiscount.finalCents / 100)
-                      : t("cycleDetail.invalidDiscount")}
-                  </p>
-                </div>
-              </div>
-            )}
+          <div>
             <div>
               <label htmlFor="pension-discount" className="field-label">
                 {t("enrollmentPage.pensionDiscount")}
@@ -229,11 +187,14 @@ function EnrollmentConfirmation({
                 id="pension-discount"
                 type="number"
                 min="0"
-                max="100"
+                max={Number(group.pension?.amount ?? 0)}
                 step="0.01"
-                value={pensionPercent}
-                onChange={(event) => setPensionPercent(event.target.value)}
+                value={pensionDiscountAmount}
+                onChange={(event) =>
+                  setPensionDiscountAmount(event.target.value)
+                }
                 className="field"
+                aria-invalid={!pensionDiscount.valid}
               />
               <div
                 className="mt-3 rounded-xl border border-cyan-100 bg-cyan-50/70 p-4"
@@ -247,7 +208,7 @@ function EnrollmentConfirmation({
                 >
                   {pensionDiscount.valid
                     ? money(pensionDiscount.finalCents / 100)
-                    : t("cycleDetail.invalidDiscount")}
+                    : t("enrollmentPage.invalidPensionDiscount")}
                 </p>
               </div>
             </div>
@@ -279,7 +240,7 @@ function EnrollmentConfirmation({
             {t("admin.cancel")}
           </button>
           <button
-            disabled={busy || !feeDiscount.valid || !pensionDiscount.valid}
+            disabled={busy || !pensionDiscount.valid}
             className="primary-button"
           >
             {t(busy ? "admin.saving" : "enrollmentPage.confirm")}
@@ -611,6 +572,14 @@ export function CycleEnrollmentsPage() {
                 {error}
               </p>
             )}
+            {cycle.status !== "ACTIVE" && (
+              <p
+                role="alert"
+                className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900"
+              >
+                {t("enrollmentPage.inactiveCycle")}
+              </p>
+            )}
             <section className="mb-6 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
               <h2 className="text-xl font-semibold text-sky-950">
                 {cycle.name}
@@ -655,6 +624,7 @@ export function CycleEnrollmentsPage() {
                     id="enrollment-branch"
                     className="field"
                     value={selectedBranchId}
+                    disabled={cycle.status !== "ACTIVE"}
                     onChange={(event) => void selectBranch(event.target.value)}
                   >
                     <option value="">{t("branches.select")}</option>
@@ -673,7 +643,11 @@ export function CycleEnrollmentsPage() {
                     id="enrollment-group"
                     className="field"
                     value={selectedGroupId}
-                    disabled={!selectedBranchId || loadingBranchGroups}
+                    disabled={
+                      cycle.status !== "ACTIVE" ||
+                      !selectedBranchId ||
+                      loadingBranchGroups
+                    }
                     onChange={(event) => setSelectedGroupId(event.target.value)}
                   >
                     <option value="">{t("enrollmentPage.selectGroup")}</option>
@@ -733,6 +707,7 @@ export function CycleEnrollmentsPage() {
                 <button
                   type="button"
                   className="primary-button"
+                  disabled={cycle.status !== "ACTIVE"}
                   onClick={() => setCreatingStudent(true)}
                 >
                   <Plus size={18} aria-hidden="true" />
@@ -764,6 +739,7 @@ export function CycleEnrollmentsPage() {
                         <button
                           type="button"
                           disabled={
+                            cycle.status !== "ACTIVE" ||
                             !selectedGroup?.pension ||
                             (cycle.category === "SCHOOL" && !cycle.fee)
                           }
@@ -807,6 +783,7 @@ export function CycleEnrollmentsPage() {
                               <button
                                 type="button"
                                 disabled={
+                                  cycle.status !== "ACTIVE" ||
                                   !selectedGroup?.pension ||
                                   (cycle.category === "SCHOOL" && !cycle.fee)
                                 }
@@ -874,6 +851,7 @@ export function CycleEnrollmentsPage() {
         )}
         {selectedStudent &&
           cycle &&
+          cycle.status === "ACTIVE" &&
           selectedGroup?.pension &&
           (cycle.category === "PREUNIVERSITY" || cycle.fee) && (
             <EnrollmentConfirmation

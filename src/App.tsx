@@ -20,6 +20,7 @@ import { BranchesPage } from "./pages/BranchesPage";
 import { CycleFormPage } from "./pages/CycleFormPage";
 import { EnrollmentsPage } from "./pages/EnrollmentsPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { RevenuePage } from "./pages/RevenuePage";
 
 function App() {
   return (
@@ -52,10 +53,15 @@ function App() {
               }
             />
           </Route>
-          <Route element={<ProtectedRoute role="ADMIN" />}>
+          <Route
+            element={<ProtectedRoute role="ADMIN" adminLevel="MAIN" />}
+          >
             <Route path="/admin" element={<AdminDashboardPage />} />
+          </Route>
+          <Route element={<ProtectedRoute role="ADMIN" />}>
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
             <Route path="/admin/payments" element={<PaymentsPage />} />
+            <Route path="/admin/revenue" element={<RevenuePage />} />
             <Route
               path="/admin/payments/:enrollmentId/manage"
               element={<RegisterPaymentPage />}

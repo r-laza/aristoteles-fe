@@ -57,6 +57,77 @@ export function EnrollmentGroupChart({
   );
 }
 
+const branchColors = ["#0369a1", "#7c3aed", "#0891b2", "#059669", "#d97706", "#e11d48"];
+
+export function BranchEnrollmentChart({
+  data,
+}: {
+  data: DashboardSummary["enrollmentComparison"];
+}) {
+  const maximum = Math.max(
+    0,
+    ...data.rows.flatMap((row) => row.counts.map((item) => item.count)),
+  );
+  if (!data.branches.length || !data.rows.length || maximum === 0)
+    return <ChartEmpty />;
+  return (
+    <div>
+      <div className="mb-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600">
+        {data.branches.map((branch, index) => (
+          <span key={branch.id} className="flex items-center gap-2">
+            <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: branchColors[index % branchColors.length] }} />
+            {branch.name}
+          </span>
+        ))}
+      </div>
+      <div className="overflow-x-auto pb-2">
+        <div className="grid h-72 items-end gap-5" style={{ gridTemplateColumns: `repeat(${data.rows.length}, minmax(110px, 1fr))`, minWidth: `max(100%, ${data.rows.length * 130}px)` }}>
+          {data.rows.map((row) => (
+            <div key={row.groupId} className="flex h-full min-w-0 flex-col justify-end">
+              <strong className="mb-2 text-center text-sm tabular-nums text-sky-950">{row.total}</strong>
+              <div className="flex h-48 items-end justify-center gap-1.5 border-b border-slate-200 px-2">
+                {data.branches.map((branch, index) => {
+                  const count = row.counts.find((item) => item.branchId === branch.id)?.count ?? 0;
+                  const tooltip = t("adminDashboard.branchGroupTooltip", { branch: branch.name, group: row.groupName, count });
+                  return <div key={branch.id} tabIndex={0} title={tooltip} aria-label={tooltip} className="w-full max-w-8 rounded-t-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500" style={{ height: `${count ? Math.max(6, (count / maximum) * 100) : 1}%`, backgroundColor: count ? branchColors[index % branchColors.length] : "#e2e8f0" }} />;
+                })}
+              </div>
+              <span className="mt-2 truncate text-center text-xs font-medium text-slate-600" title={row.groupName}>{row.groupName}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function BranchEnrollmentTable({
+  data,
+}: {
+  data: DashboardSummary["enrollmentComparison"];
+}) {
+  if (!data.branches.length || !data.rows.length) return <ChartEmpty />;
+  return (
+    <div className="overflow-x-auto rounded-xl border border-slate-200">
+      <table className="w-full min-w-[560px] text-left text-sm">
+        <thead className="bg-slate-50 text-slate-600">
+          <tr>
+            <th className="px-4 py-3">{t("adminDashboard.group")}</th>
+            {data.branches.map((branch) => <th key={branch.id} className="px-4 py-3 text-center">{branch.name}</th>)}
+            <th className="px-4 py-3 text-center">{t("adminDashboard.total")}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {data.rows.map((row) => <tr key={row.groupId}><th className="px-4 py-3 font-medium text-sky-950">{row.groupName}</th>{data.branches.map((branch) => <td key={branch.id} className="px-4 py-3 text-center tabular-nums">{row.counts.find((item) => item.branchId === branch.id)?.count ?? 0}</td>)}<td className="px-4 py-3 text-center font-bold tabular-nums text-sky-950">{row.total}</td></tr>)}
+        </tbody>
+        <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-bold text-sky-950">
+          <tr><th className="px-4 py-3">{t("adminDashboard.total")}</th>{data.branches.map((branch) => <td key={branch.id} className="px-4 py-3 text-center tabular-nums">{data.rows.reduce((sum, row) => sum + (row.counts.find((item) => item.branchId === branch.id)?.count ?? 0), 0)}</td>)}<td className="px-4 py-3 text-center tabular-nums">{data.rows.reduce((sum, row) => sum + row.total, 0)}</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
 export function MonthlyRevenueChart({ data }: { data: Monthly[] }) {
   const maximum = Math.max(0, ...data.map((row) => amount(row.total)));
   if (maximum === 0) return <ChartEmpty />;

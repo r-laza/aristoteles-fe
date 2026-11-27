@@ -1222,6 +1222,7 @@ export function AdminPage() {
   const [permissionsReady, setPermissionsReady] = useState(true);
   const [permissionError, setPermissionError] = useState("");
   const canManageAdmins = permissionsReady && canManageAdministrators(user);
+  const canManageStaff = canManageAdministrators(user);
   const [people, setPeople] = useState<Person[]>([]);
   const [tab, setTab] = useState<TabRole>("STUDENT");
   const [loading, setLoading] = useState(true);
@@ -1264,7 +1265,9 @@ export function AdminPage() {
     void load();
   }
   const current = people.filter((person) => person.role === tab);
-  const tabs: TabRole[] = ["STUDENT", "TEACHER", "ADMIN"];
+  const tabs: TabRole[] = canManageStaff
+    ? ["STUDENT", "TEACHER", "ADMIN"]
+    : ["STUDENT"];
   return (
     <AppLayout>
       <div className="py-5">
@@ -1272,12 +1275,17 @@ export function AdminPage() {
           {t("admin.peopleTitle")}
         </h1>
         <p className="mt-2 text-slate-500">{t("admin.subtitle")}</p>
-        <div className="my-8 grid gap-4 sm:grid-cols-3">
-          {[
-            ["admin.students", "STUDENT"],
-            ["admin.teachers", "TEACHER"],
-            ["admin.administrators", "ADMIN"],
-          ].map(([label, role]) => (
+        <div
+          className={`my-8 grid gap-4 ${canManageStaff ? "sm:grid-cols-3" : "sm:grid-cols-1"}`}
+        >
+          {(canManageStaff
+            ? [
+                ["admin.students", "STUDENT"],
+                ["admin.teachers", "TEACHER"],
+                ["admin.administrators", "ADMIN"],
+              ]
+            : [["admin.students", "STUDENT"]]
+          ).map(([label, role]) => (
             <section
               key={role}
               className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm"
@@ -1296,7 +1304,7 @@ export function AdminPage() {
           <div
             role="tablist"
             aria-label={t("admin.peopleTypes")}
-            className="mb-6 grid grid-cols-3 border-b"
+            className={`mb-6 grid border-b ${canManageStaff ? "grid-cols-3" : "grid-cols-1"}`}
           >
             {tabs.map((role) => (
               <button

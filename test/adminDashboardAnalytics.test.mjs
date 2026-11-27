@@ -91,9 +91,22 @@ test("method percentages use overall collections rather than hiding historical p
   assert.match(donut.props.style.background, /#e2e8f0 50% 100%/);
 });
 
+test("branch comparison renders grouped bars and a group by branch table", () => {
+  const data = {
+    branches: [{ id: 1, name: "Centro" }, { id: 2, name: "Huánuco" }],
+    rows: [{ groupId: 4, groupName: "Kids", counts: [{ branchId: 1, count: 3 }, { branchId: 2, count: 2 }], total: 5 }],
+  };
+  const chart = exports.BranchEnrollmentChart({ data });
+  assert.equal(elements(chart, (element) => element.props.title === "Centro · Kids: 3 estudiantes").length, 1);
+  assert.equal(elements(chart, (element) => element.props.title === "Huánuco · Kids: 2 estudiantes").length, 1);
+  const table = exports.BranchEnrollmentTable({ data });
+  assert.ok(elements(table, (element) => element.type === "table").length);
+});
+
 test("enrollment and financial charts provide localized empty states", () => {
   for (const tree of [
     exports.EnrollmentGroupChart({ data: [] }),
+    exports.BranchEnrollmentChart({ data: { branches: [], rows: [] } }),
     exports.DonutChart({
       items: [],
       centerLabel: "",

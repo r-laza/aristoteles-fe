@@ -517,7 +517,7 @@ export function AcademicCycleDetailPage() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <Link
-                            to={`/admin/cycles/${id}/enrollments?branchId=${branch.id}`}
+                            to={`/admin/enrollments?cycleId=${id}&branchId=${branch.id}`}
                             className="rounded-xl border border-sky-200 px-3 py-2 text-sm font-semibold text-sky-800"
                           >
                             {t("cycleDetail.enroll")}

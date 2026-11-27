@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   BookOpen,
   CalendarDays,
+  CircleDollarSign,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -18,7 +19,10 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../../auth/useAuth";
-import { dashboardPath } from "../../auth/types";
+import {
+  canManageAdministrators,
+  dashboardPath,
+} from "../../auth/types";
 import { t } from "../../lib/i18n";
 
 type NavItem = {
@@ -43,6 +47,11 @@ const adminSections = [
     label: t("navigation.administration"),
     items: [
       { label: t("navigation.users"), icon: Users, to: "/admin/users" },
+      {
+        label: t("navigation.revenue"),
+        icon: CircleDollarSign,
+        to: "/admin/revenue",
+      },
     ],
   },
   {
@@ -111,6 +120,7 @@ function activeAdminPath(pathname: string, search: string): string {
   for (const path of [
     "/admin/enrollments-pensions",
     "/admin/payments",
+    "/admin/revenue",
     "/admin/users",
     "/admin/groups",
     "/admin/cycles",
@@ -194,7 +204,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const home: NavItem = {
     label: t("navigation.home"),
     icon: House,
-    to: user ? dashboardPath(user.role) : "/login",
+    to: user ? dashboardPath(user) : "/login",
   };
 
   return (
@@ -277,12 +287,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
           ) : user?.role === "ADMIN" ? (
             <div className="space-y-3">
-              <NavigationLink
-                item={home}
-                collapsed={isCollapsed}
-                onClose={onClose}
-                activePath={activePath}
-              />
+              {canManageAdministrators(user) && (
+                <NavigationLink
+                  item={home}
+                  collapsed={isCollapsed}
+                  onClose={onClose}
+                  activePath={activePath}
+                />
+              )}
 
               {adminSections.map((section) => {
                 const isExpanded = expanded[section.id];

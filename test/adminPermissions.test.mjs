@@ -56,7 +56,7 @@ function renderPeople(actor) {
         const value = Array.isArray(initial)
           ? staff
           : initial === "STUDENT"
-            ? "ADMIN"
+            ? actor.adminLevel === "MAIN" ? "ADMIN" : "STUDENT"
             : initial === true
               ? firstBoolean
               : initial;
@@ -96,10 +96,12 @@ test("only active Main administrators possess administrator-management permissio
   }
 });
 
-test("regular administrators retain the list and tabs but have no create or edit actions on desktop or mobile", () => {
+test("regular administrators see only student management", () => {
   const html = renderPeople(staff[1]);
-  assert.match(html, /Main account/);
-  assert.match(html, /Regular account/);
+  assert.doesNotMatch(html, /Main account|Regular account/);
+  assert.match(html, new RegExp(locale.admin.students));
+  assert.doesNotMatch(html, new RegExp(locale.admin.teachers));
+  assert.doesNotMatch(html, new RegExp(locale.admin.administrators));
   assert.match(html, /role="tab"/);
   assert.doesNotMatch(html, new RegExp(locale.admin.createByRole.ADMIN));
   assert.doesNotMatch(html, new RegExp(locale.admin.editPerson));

@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { t } from "../../lib/i18n";
-import { ApiError } from "../../services/api";
 import { CycleModal as Modal } from "./CycleModal";
 import {
   cycleApi,
@@ -8,7 +7,7 @@ import {
   type AvailableStudent,
   type EnrollmentFee,
 } from "./cycles";
-import { calculateDiscount } from "./enrollment";
+import { calculateFixedDiscount, enrollmentErrorKey } from "./enrollment";
 const amount = (value: number | string) =>
   t("cycles.amount", {
     amount: Number(value).toLocaleString("es-EC", {
@@ -38,9 +37,7 @@ export function EnrollmentForm({
   const pension = selectedGroup?.pension ?? null;
   const baseFee = Number(fee?.amount ?? 0);
   const pensionBase = Number(pension?.amount ?? 0);
-  const [enrollmentDiscountPercent, setEnrollmentDiscountPercent] =
-    useState("0");
-  const [pensionDiscountPercent, setPensionDiscountPercent] = useState("0");
+  const [pensionDiscountAmount, setPensionDiscountAmount] = useState("0.00");
   useEffect(() => {
     let cancelled = false;
     cycleApi
@@ -58,23 +55,16 @@ export function EnrollmentForm({
       cancelled = true;
     };
   }, [id]);
-  const enrollmentDiscount = calculateDiscount(
-    baseFee,
-    enrollmentDiscountPercent,
-  );
-  const pensionDiscount = calculateDiscount(
+  const pensionDiscount = calculateFixedDiscount(
     pensionBase,
-    pensionDiscountPercent,
+    pensionDiscountAmount,
   );
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
-      !fee ||
-      !pension ||
-      !enrollmentDiscount.valid ||
-      !pensionDiscount.valid
+      !fee || !pension || !pensionDiscount.valid
     ) {
-      setError(t("cycleDetail.invalidDiscount"));
+      setError(t("enrollmentPage.invalidPensionDiscount"));
       return;
     }
     const data = new FormData(event.currentTarget);
@@ -85,19 +75,12 @@ export function EnrollmentForm({
         studentId: Number(data.get("studentId")),
         groupId: Number(groupId),
         branchId: groups.find((group) => group.id === Number(groupId))!.branch.id,
-        discountPercent: enrollmentDiscountPercent || "0",
-        pensionDiscountPercent: pensionDiscountPercent || "0",
+        pensionDiscountAmount: pensionDiscountAmount || "0",
         discountReason: String(data.get("discountReason")).trim(),
       });
       onCreated();
     } catch (error) {
-      setError(
-        t(
-          error instanceof ApiError && error.status === 409
-            ? "cycleDetail.duplicate"
-            : "cycleDetail.saveError",
-        ),
-      );
+      setError(t(enrollmentErrorKey(error)));
     } finally {
       setBusy(false);
     }
@@ -177,53 +160,6 @@ export function EnrollmentForm({
                   </p>
                 )}
               </div>
-              <div>
-                <label htmlFor="enroll-discount" className="field-label">
-                  {t("cycleDetail.enrollmentDiscountPercent")}
-                </label>
-                <input
-                  id="enroll-discount"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={enrollmentDiscountPercent}
-                  onChange={(event) =>
-                    setEnrollmentDiscountPercent(event.target.value)
-                  }
-                  className="field"
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="field-label">
-                    {t("cycleDetail.discountApplied")}
-                  </label>
-                  <input
-                    readOnly
-                    value={
-                      enrollmentDiscount.valid
-                        ? amount(enrollmentDiscount.discountCents / 100)
-                        : t("cycleDetail.invalidDiscount")
-                    }
-                    className="field bg-slate-50"
-                  />
-                </div>
-                <div>
-                  <label className="field-label">
-                    {t("cycleDetail.totalEnrollment")}
-                  </label>
-                  <input
-                    readOnly
-                    value={
-                      enrollmentDiscount.valid
-                        ? amount(enrollmentDiscount.finalCents / 100)
-                        : t("cycleDetail.invalidDiscount")
-                    }
-                    className="field bg-sky-50 font-semibold"
-                  />
-                </div>
-              </div>
             </section>
             {pension && (
               <section className="space-y-4 rounded-xl border border-slate-200 p-4">
@@ -249,19 +185,20 @@ export function EnrollmentForm({
                 </div>
                 <div>
                   <label htmlFor="pension-discount" className="field-label">
-                    {t("cycleDetail.pensionDiscountPercent")}
+                    {t("enrollmentPage.pensionDiscount")}
                   </label>
                   <input
                     id="pension-discount"
                     type="number"
                     min="0"
-                    max="100"
+                    max={pensionBase}
                     step="0.01"
-                    value={pensionDiscountPercent}
+                    value={pensionDiscountAmount}
                     onChange={(event) =>
-                      setPensionDiscountPercent(event.target.value)
+                      setPensionDiscountAmount(event.target.value)
                     }
                     className="field"
+                    aria-invalid={!pensionDiscount.valid}
                   />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -274,7 +211,7 @@ export function EnrollmentForm({
                       value={
                         pensionDiscount.valid
                           ? amount(pensionDiscount.discountCents / 100)
-                          : t("cycleDetail.invalidDiscount")
+                          : t("enrollmentPage.invalidPensionDiscount")
                       }
                       className="field bg-slate-50"
                     />
@@ -288,7 +225,7 @@ export function EnrollmentForm({
                       value={
                         pensionDiscount.valid
                           ? amount(pensionDiscount.finalCents / 100)
-                          : t("cycleDetail.invalidDiscount")
+                          : t("enrollmentPage.invalidPensionDiscount")
                       }
                       className="field bg-sky-50 font-semibold"
                     />
@@ -328,7 +265,6 @@ export function EnrollmentForm({
                 !fee ||
                 !pension ||
                 students.length === 0 ||
-                !enrollmentDiscount.valid ||
                 !pensionDiscount.valid
               }
               className="primary-button"

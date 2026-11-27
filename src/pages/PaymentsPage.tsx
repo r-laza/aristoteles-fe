@@ -98,7 +98,7 @@ export function PaymentsPage() {
                 disabled={cycleId === null}
                 onClick={() => {
                   if (cycleId !== null) {
-                    navigate(`/admin/cycles/${cycleId}/enrollments`);
+                    navigate(`/admin/enrollments?cycleId=${cycleId}`);
                   }
                 }}
                 className="primary-button inline-flex min-h-12 items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"

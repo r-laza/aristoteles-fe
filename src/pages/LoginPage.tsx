@@ -41,7 +41,7 @@ export function LoginPage() {
         {t("auth.loading")}
       </div>
     );
-  if (user) return <Navigate to={dashboardPath(user.role)} replace />;
+  if (user) return <Navigate to={dashboardPath(user)} replace />;
   return (
     <main className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-sky-950 via-sky-900 to-cyan-700 px-4 py-10">
       <section className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl sm:p-10">

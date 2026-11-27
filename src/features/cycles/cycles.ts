@@ -197,6 +197,12 @@ export type AvailableStudent = {
   id: number;
   fullName: string;
   dni: string;
+  representativeName: string;
+  representativeDocumentType: "DNI" | "CE" | "PASSPORT" | null;
+  representativeDocumentNumber: string | null;
+  relationship: "FATHER" | "MOTHER" | "OTHER";
+  relationshipOther: string | null;
+  primaryPhone: string;
 };
 export const cycleApi = {
   branches: () => api<Branch[]>("/api/admin/branches"),
@@ -301,8 +307,7 @@ export const cycleApi = {
       studentId: number;
       branchId: number;
       groupId: number;
-      discountPercent: string;
-      pensionDiscountPercent: string;
+      pensionDiscountAmount: string;
       discountReason: string;
       preuniversityInstallments?: number;
       preuniversityDueRule?: PreuniversityDueRule;
